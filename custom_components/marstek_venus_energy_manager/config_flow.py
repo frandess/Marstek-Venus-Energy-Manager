@@ -1,6 +1,7 @@
 """Config flow for Marstek Venus Energy Manager integration."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -592,16 +593,23 @@ class OptionsFlowHandler(OptionsFlow):
                 break
 
         if existing_coordinator is not None:
+            _LOGGER.info(
+                "Reusing coordinator for %s (version=%s) - closing connection for test",
+                host, existing_coordinator.battery_version
+            )
             # Hold the lock so polling and control loop wait (no errors/warnings)
             async with existing_coordinator.lock:
                 # Close existing connection to free the single-connection slot
                 await existing_coordinator.client.async_close()
+                # Give firmware time to release the connection slot
+                await asyncio.sleep(0.5)
 
                 # Test with a fresh connection
                 test_client = MarstekModbusClient(host, port)
                 try:
                     connected = await test_client.async_connect()
                     if not connected:
+                        _LOGGER.warning("Test connection to %s failed after closing coordinator", host)
                         await existing_coordinator.client.async_connect()
                         return False
 
@@ -609,20 +617,25 @@ class OptionsFlowHandler(OptionsFlow):
                         soc_register, "uint16"
                     )
                     await test_client.async_close()
+                    await asyncio.sleep(0.3)
 
                     # Reconnect the coordinator's connection
                     await existing_coordinator.client.async_connect()
 
+                    _LOGGER.info("Test connection to %s successful (SOC=%s), coordinator reconnected", host, value)
                     return value is not None
-                except Exception:
+                except Exception as e:
+                    _LOGGER.warning("Test connection to %s failed with exception: %s", host, e)
                     try:
                         await test_client.async_close()
                     except Exception:
                         pass
+                    await asyncio.sleep(0.3)
                     # Always reconnect coordinator, even on error
                     await existing_coordinator.client.async_connect()
                     return False
         else:
+            _LOGGER.info("No existing coordinator for %s - opening new connection", host)
             # No existing coordinator for this host - open new connection directly
             client = MarstekModbusClient(host, port)
             try:
