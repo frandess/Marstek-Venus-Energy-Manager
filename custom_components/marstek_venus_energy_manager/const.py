@@ -41,7 +41,7 @@ REGISTER_MAP = {
         "max_discharge_power": 44003,
         "battery_soc": 37005,
         "battery_power": 30001,
-        "user_work_mode": 43000,
+        "user_work_mode": None,
     }
 }
 
@@ -710,15 +710,6 @@ SENSOR_DEFINITIONS_V3 = [
 BINARY_SENSOR_DEFINITIONS_V3 = []
 
 SELECT_DEFINITIONS_V3 = [
-    {
-        "register": 43000,
-        "name": "Working Mode",
-        "key": "user_work_mode",
-        "enabled_by_default": True,
-        "scan_interval": "high",
-        "data_type": "uint16",
-        "options": {"manual": 0, "anti_feed": 1, "trade_mode": 2},
-    },
     {
         "register": 42010,
         "name": "Force Mode",

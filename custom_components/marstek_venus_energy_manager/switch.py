@@ -198,10 +198,6 @@ class ManualModeSwitch(SwitchEntity):
                 if force_reg:
                     await coordinator.write_register(force_reg, 0, do_refresh=False)
 
-                # v3: keep user_work_mode=0 (Manual). The battery stays idle
-                # waiting for manual commands. Do NOT set Auto, as that would
-                # let the battery operate on its own.
-
                 await coordinator.async_request_refresh()
                 _LOGGER.info("Set %s to 0W (idle) for manual mode", coordinator.name)
             except Exception as e:

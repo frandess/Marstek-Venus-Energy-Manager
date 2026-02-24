@@ -1,7 +1,9 @@
-Release 1.0.4b5
+Release 1.0.4b6
 
 ### Fixed
-- **V3 RS485 Control Mode switch missing**: Restored `RS485 Control Mode` switch definition in `SWITCH_DEFINITIONS_V3`. The switch had been incorrectly removed, preventing V3 users from toggling RS485 control mode via the UI.
-- **Options flow connection validation**: Changed how battery connections are validated during reconfiguration. Instead of opening a second Modbus TCP connection (which the firmware rejects since it only supports one simultaneous connection), the options flow now temporarily closes the coordinator's active connection under lock, tests with a fresh connection, and reconnects the coordinator. Polling and control loop pause transparently during the test.
-- Added delay after closing connections in options flow test to allow firmware to release the connection slot before reconnecting.
-- Added diagnostic logging to options flow connection test for troubleshooting connection issues.
+- **V3 shutdown hangs on RS485 disable**: The shutdown sequence wrote `0` to register 42000 to disable RS485 control mode, but the firmware only accepts `0x55BB` (21947). The invalid value caused a Modbus Exception 3 (Illegal Data Value) with 40s+ timeout, blocking integration reload. Now writes the correct `command_off` value (0x55BB).
+- **V3 work mode manipulation removed**: Removed V3-specific code that set `user_work_mode` to Manual (0) on setup and restored to Auto (1) on shutdown via register 43000. V3 batteries operate the same as V2 and do not require work mode changes. This also eliminates the state conflict that caused the RS485 disable to fail during shutdown.
+
+### Removed
+- `Working Mode` select entity for V3 batteries (was exposed as Manual / Anti-Feed / Trade Mode). The register is not needed for integration control.
+- `user_work_mode` entry from V3 register map (set to `None`, matching V2).

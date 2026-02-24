@@ -2193,14 +2193,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     await coordinator.write_register(rs485_reg, 21930, do_refresh=False)  # 0x55AA
                     await asyncio.sleep(0.1)
 
-                # For v3: set Working Mode to Manual (0) during active control
-                if coordinator.battery_version == "v3":
-                    work_mode_reg = coordinator.get_register("user_work_mode")
-                    if work_mode_reg:
-                        await coordinator.write_register(work_mode_reg, 0, do_refresh=False)  # Manual
-                        await asyncio.sleep(0.1)
-                        _LOGGER.info("%s: Working Mode set to Manual (0) for v3 active control", coordinator.name)
-
                 # Write initial configuration values to the battery
                 max_soc_value = int(battery_config["max_soc"] / 0.1)  # Convert to register value
                 min_soc_value = int(battery_config["min_soc"] / 0.1)  # Convert to register value
@@ -2387,18 +2379,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     await coordinator.write_register(force_reg, 0, do_refresh=False)
                     await asyncio.sleep(0.05)
 
-                # For v3: restore Working Mode to Auto (1) before disconnecting
-                if coordinator.battery_version == "v3":
-                    work_mode_reg = coordinator.get_register("user_work_mode")
-                    if work_mode_reg:
-                        await coordinator.write_register(work_mode_reg, 1, do_refresh=False)  # Auto/Anti-Feed
-                        await asyncio.sleep(0.1)
-                        _LOGGER.info("%s: Working Mode restored to Auto (1) for v3 shutdown", coordinator.name)
-
                 # Disable RS485 Control Mode (return control to battery's internal logic)
                 _LOGGER.info("Disabling RS485 control mode for %s", coordinator.name)
                 if rs485_reg:
-                    await coordinator.write_register(rs485_reg, 0, do_refresh=False)
+                    await coordinator.write_register(rs485_reg, 21947, do_refresh=False)  # 0x55BB = disable
                     await asyncio.sleep(0.1)
 
                 _LOGGER.info("%s: Shutdown complete - all control registers reset", coordinator.name)
