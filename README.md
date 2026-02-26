@@ -1,7 +1,7 @@
 # Marstek Venus Energy Manager
 
 
-The **Marstek Venus Energy Manager** is a comprehensive Home Assistant integration designed to monitor and control Marstek Venus E series batteries (v2 and v3 (untested)) via Modbus TCP. It provides advanced energy management features including predictive grid charging, customizable time slots for discharge control, and device load exclusion logic.
+The **Marstek Venus Energy Manager** is a comprehensive Home Assistant integration designed to monitor and control Marstek Venus E series batteries (v2 and v3) via Modbus TCP. It provides advanced energy management features including predictive grid charging, customizable time slots for discharge control, and device load exclusion logic.
 
 > [!CAUTION]
 > **LIABILITY DISCLAIMER:**
@@ -183,7 +183,7 @@ For each configured battery (`Device`), you will see:
 
 The development and testing of this integration were performed using the following hardware setup:
 
-*   **Batteries**: 2x Marstek Venus E v2 units.
+*   **Batteries**: 2x Marstek Venus E v2 units and 2x v3 units.
 *   **Connectivity**: Elfin-EW11 Modbus to WiFi converter.
 *   **Metering**: Shelly Pro 3EM Energy Meter (providing the grid consumption data).
 
