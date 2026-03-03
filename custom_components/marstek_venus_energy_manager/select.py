@@ -84,7 +84,13 @@ class MarstekVenusSelect(CoordinatorEntity, SelectEntity):
         }
 
 
-WEEKDAY_OPTIONS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+WEEKDAY_OPTIONS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+# Map full names to internal short codes used in config_entry.data and WEEKDAY_MAP
+WEEKDAY_TO_CODE = {
+    "Monday": "mon", "Tuesday": "tue", "Wednesday": "wed", "Thursday": "thu",
+    "Friday": "fri", "Saturday": "sat", "Sunday": "sun",
+}
+CODE_TO_WEEKDAY = {v: k for k, v in WEEKDAY_TO_CODE.items()}
 
 
 class WeeklyFullChargeDaySelect(SelectEntity):
@@ -103,15 +109,17 @@ class WeeklyFullChargeDaySelect(SelectEntity):
 
     @property
     def current_option(self) -> str:
-        """Return the currently selected day."""
-        return self.entry.data.get(CONF_WEEKLY_FULL_CHARGE_DAY, "sun")
+        """Return the currently selected day as full name."""
+        code = self.entry.data.get(CONF_WEEKLY_FULL_CHARGE_DAY, "sun")
+        return CODE_TO_WEEKDAY.get(code, "Sunday")
 
     async def async_select_option(self, option: str) -> None:
         """Update the selected day in config_entry.data."""
+        code = WEEKDAY_TO_CODE.get(option, option)
         new_data = dict(self.entry.data)
-        new_data[CONF_WEEKLY_FULL_CHARGE_DAY] = option
+        new_data[CONF_WEEKLY_FULL_CHARGE_DAY] = code
         self.hass.config_entries.async_update_entry(self.entry, data=new_data)
-        _LOGGER.info("Weekly full charge day updated to %s", option)
+        _LOGGER.info("Weekly full charge day updated to %s (%s)", option, code)
         self.async_write_ha_state()
 
     @property

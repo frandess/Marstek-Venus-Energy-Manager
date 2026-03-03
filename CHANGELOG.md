@@ -1,9 +1,9 @@
 # Changelog
 
-## [1.2.0] - 2026-03-02
+## [1.2.0b1] - 2026-03-02
 
 ### Added
-- **Solar surplus mode for excluded devices**: New `allow_solar_surplus` option in excluded device configuration. When enabled, the battery will not charge to compensate for the device's consumption when it is running on solar surplus. The adjustment is capped to real grid import (`min(device_power, max(0, grid_import))`), so if the device runs entirely on solar the battery stays idle, and if it partially draws from the grid the battery only ignores the grid portion. Recommended for high-consumption devices like EV chargers.
+- **Solar surplus mode for excluded devices**: New `allow_solar_surplus` option in excluded device configuration. When the battery is **charging**, no adjustment is applied — the PD controller sees real grid power and naturally reduces charging to leave solar for the device. When the battery is **discharging**, full exclusion applies so the battery won't drain to power the device. Recommended for high-consumption devices like EV chargers.
 - **Native config entities**: Exposed key configuration parameters as Home Assistant entities, eliminating the need to run the full Options Flow wizard for routine adjustments:
   - **PD controller number entities**: Kp, Kd, deadband, max power change, direction hysteresis, min charge/discharge power — all hot-reloadable without integration restart.
   - **Max Contracted Power number entity**: Editable from the UI when predictive charging is enabled.
@@ -11,6 +11,14 @@
   - **Time Slot switches**: Enable/disable individual no-discharge time slots on the fly.
   - **Excluded Devices Config sensor**: Read-only diagnostic showing the number of excluded devices, with per-device details (sensor entity, included_in_consumption, allow_solar_surplus) as attributes.
 - **Discharge Window diagnostic sensor**: Real-time sensor showing whether the system is currently inside an allowed discharge time slot. Displays "Active (Slot N)", "Inactive", or "No slots". Attributes include all slot configuration details (schedule, days, enabled, apply_to_charge, target_grid_power). Replaces the per-slot Time Slot Info sensors.
+- **Battery load sharing**: Intelligent battery selection that uses the minimum number of batteries needed to keep each one operating in its optimal efficiency zone. Based on the Venus efficiency curve, batteries activate when total power exceeds 60% of combined capacity (peak efficiency ~91% at 1000-1500W). Features:
+  - **Discharge priority**: Highest SOC first (drain fullest battery).
+  - **Charge priority**: Lowest SOC first (fill emptiest battery).
+  - **SOC hysteresis (5%)**: Active battery stays selected until another exceeds it by 5% SOC.
+  - **Energy hysteresis (2.5 kWh)**: Tiebreaker uses lifetime energy with 2.5 kWh advantage for active battery, balancing long-term wear.
+  - **Power hysteresis (±100W)**: Activates 2nd battery at 60% capacity threshold, deactivates at 50% to prevent ping-pong with fluctuating loads.
+  - Applies to all modes: normal PD control, solar charging, and predictive grid charging.
+  - **Active Batteries diagnostic sensor**: Real-time sensor showing which batteries are currently active in load sharing. Displays "Discharging: Venus 1", "Charging: Venus 2", or "Idle". Attributes include per-battery SOC, lifetime discharged/charged energy, and active battery counts. Only created for multi-battery setups.
 
 ### Improved
 - **Modbus TCP connection management**: Overhauled the Modbus connection lifecycle to prevent permanent battery disconnection (especially on V3, which only accepts one TCP connection). Reconnection now creates a fresh pymodbus client instance every time — closing the old socket first (sending TCP FIN to release the battery's connection slot), then connecting with `reconnect_delay=0` to disable pymodbus's internal auto-reconnect which grew exponentially up to 300 seconds. Added coordinator-level connection health monitoring: after 3 consecutive failed poll cycles a fresh reconnection is triggered; after 5 failures, polling is suspended for 2 minutes to avoid flooding unreachable batteries. Normal 1.5s polling resumes automatically on recovery. The PD control loop now skips unreachable batteries via `coordinator.is_available` instead of writing to dead connections.
@@ -31,6 +39,7 @@
 ### Fixed
 - **`write_register()` refresh never executed**: The `async_request_refresh()` call after a successful register write was dead code — it sat after `return True` inside the `async with self.lock` block and was never reached. Restructured the method so the refresh executes outside the lock after a successful write.
 - **First execution ignores time slot restrictions**: After integration reload/reconfiguration, the first control cycle sent power to batteries without checking time slot restrictions. This caused a brief discharge pulse (~2.5s) even when the current day/time was outside any configured slot, which was then corrected to 0W on the next cycle. The first execution now checks `_is_operation_allowed()` before sending any power commands.
+- **Charge/discharge power limits swapped**: The PD controller clamped charging power using `max_discharge_power` and vice versa. This caused charging to be limited to the discharge limit (e.g., 800W instead of 2500W) and discharge to use the charge limit. Both clamp conditions now use the correct limit for their direction.
 
 ## [1.1.1] - 2026-02-27
 

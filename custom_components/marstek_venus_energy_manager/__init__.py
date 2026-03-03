@@ -103,6 +103,10 @@ class ChargeDischargeController:
         # Calculate dynamic anti-windup limits based on total system capacity
         self.max_charge_capacity = sum(c.max_charge_power for c in coordinators)
         self.max_discharge_capacity = sum(c.max_discharge_power for c in coordinators)
+
+        # Load sharing state: track which batteries were active last cycle
+        self._active_discharge_batteries = []
+        self._active_charge_batteries = []
         
         # Predictive Grid Charging state
         self.predictive_charging_enabled = config_entry.data.get(CONF_ENABLE_PREDICTIVE_CHARGING, False)
@@ -1317,21 +1321,22 @@ class ChargeDischargeController:
             sensor_filtered, target_power, error, P, D, pd_adjustment, self.previous_power, abs(new_power)
         )
 
-        # Distribute power respecting individual battery limits
-        power_allocation = self._distribute_power_by_limits(abs(new_power), available_batteries, is_charging=True)
+        # Select batteries via load sharing, then distribute power
+        selected_batteries = self._select_batteries_for_operation(abs(new_power), available_batteries, is_charging=True)
+        power_allocation = self._distribute_power_by_limits(abs(new_power), selected_batteries, is_charging=True)
 
         total_allocated = sum(power_allocation.values())
         _LOGGER.info("Predictive: Setting charge to %dW total across %d batteries: %s",
-                    total_allocated, len(available_batteries),
+                    total_allocated, len(selected_batteries),
                     {c.name: p for c, p in power_allocation.items()})
 
-        # Write to batteries
-        for coordinator in available_batteries:
+        # Write to selected batteries
+        for coordinator in selected_batteries:
             await self._set_battery_power(coordinator, power_allocation.get(coordinator, 0), 0)
-        
-        # Set unavailable batteries to 0
+
+        # Set all other batteries to 0 (non-available + available-but-not-selected)
         for coordinator in self.coordinators:
-            if coordinator not in available_batteries:
+            if coordinator not in selected_batteries:
                 await self._set_battery_power(coordinator, 0, 0)
         
         # Update state
@@ -1391,6 +1396,103 @@ class ChargeDischargeController:
                 allocation[c] = 0
 
         return allocation
+
+    def _select_batteries_for_operation(
+        self,
+        total_power: float,
+        available_batteries: list,
+        is_charging: bool
+    ) -> list:
+        """Select minimum batteries needed so total_power <= 60% of combined capacity.
+
+        Prioritizes:
+        - Discharge: Highest SOC first (drain fullest battery first)
+        - Charge: Lowest SOC first (fill emptiest battery first)
+
+        Hysteresis:
+        - SOC: Active batteries get 5% effective SOC advantage to avoid ping-pong
+        - Power: Activate at 60%, deactivate at 50% (~100W hysteresis band)
+        """
+        if len(available_batteries) <= 1:
+            return list(available_batteries)
+
+        # No power requested — clear state and return empty
+        if total_power <= 0:
+            self._active_discharge_batteries = []
+            self._active_charge_batteries = []
+            return list(available_batteries)
+
+        ACTIVATION_THRESHOLD = 0.60
+        DEACTIVATION_THRESHOLD = 0.50
+        SOC_HYSTERESIS = 5.0
+        ENERGY_HYSTERESIS = 2.5  # kWh advantage for active battery in tiebreaker
+
+        previous_active = (
+            self._active_charge_batteries if is_charging
+            else self._active_discharge_batteries
+        )
+
+        def sort_key(coordinator):
+            soc = coordinator.data.get("battery_soc", 50) if coordinator.data else 50
+            is_active = coordinator in previous_active
+
+            if is_charging:
+                # Lowest SOC first; active batteries get -5% to stay selected
+                effective_soc = soc - (SOC_HYSTERESIS if is_active else 0)
+                energy = coordinator.data.get("total_charging_energy", 0) if coordinator.data else 0
+                # Active battery gets -2.5 kWh advantage (lower = selected first)
+                effective_energy = energy - (ENERGY_HYSTERESIS if is_active else 0)
+                return (effective_soc, effective_energy)
+            else:
+                # Highest SOC first; active batteries get +5% to stay selected
+                effective_soc = soc + (SOC_HYSTERESIS if is_active else 0)
+                energy = coordinator.data.get("total_discharging_energy", 0) if coordinator.data else 0
+                # Active battery gets -2.5 kWh advantage (lower = selected first)
+                effective_energy = energy - (ENERGY_HYSTERESIS if is_active else 0)
+                return (-effective_soc, effective_energy)
+
+        sorted_batteries = sorted(available_batteries, key=sort_key)
+
+        # Select minimum batteries needed
+        selected = []
+        combined_capacity = 0
+
+        for battery in sorted_batteries:
+            selected.append(battery)
+            limit = battery.max_charge_power if is_charging else battery.max_discharge_power
+            combined_capacity += limit
+
+            if total_power <= combined_capacity * ACTIVATION_THRESHOLD:
+                break
+
+        # Power hysteresis: can we remove the last battery added?
+        if len(selected) > 1 and len(previous_active) > 0:
+            last = selected[-1]
+            last_limit = last.max_charge_power if is_charging else last.max_discharge_power
+            capacity_without_last = combined_capacity - last_limit
+
+            if (total_power <= capacity_without_last * DEACTIVATION_THRESHOLD
+                    and last not in previous_active):
+                selected.pop()
+
+        # Log when selection changes
+        if set(selected) != set(previous_active):
+            mode = "charge" if is_charging else "discharge"
+            _LOGGER.info(
+                "Load sharing [%s]: %d/%d batteries active (%s) for %dW",
+                mode, len(selected), len(available_batteries),
+                ", ".join(c.name for c in selected), int(total_power)
+            )
+
+        # Update tracking state: clear opposite list since charge/discharge are mutually exclusive
+        if is_charging:
+            self._active_charge_batteries = list(selected)
+            self._active_discharge_batteries = []
+        else:
+            self._active_discharge_batteries = list(selected)
+            self._active_charge_batteries = []
+
+        return selected
 
     async def _set_battery_power(
         self,
@@ -1469,14 +1571,17 @@ class ChargeDischargeController:
 
     def _calculate_excluded_devices_adjustment(self, current_grid_power: float) -> float:
         """Calculate power adjustment for excluded devices.
-        
+
         Logic:
         - If device IS included in home consumption sensor (included_in_consumption=True):
           → SUBTRACT its power (battery should NOT power this device)
-          → If allow_solar_surplus is True, the adjustment is capped to current_grid_power so it can consume surplus.
+          → If allow_solar_surplus is True:
+            - During DISCHARGE (previous_power < 0): full exclusion (battery won't discharge for device)
+            - During CHARGE (previous_power >= 0): no exclusion (PD sees real grid, reduces charging
+              to leave solar for the device — avoids feedback loop that causes grid import)
         - If device is NOT included in home consumption sensor (included_in_consumption=False):
           → ADD its power (battery SHOULD power this device, even though home sensor doesn't see it)
-        
+
         Returns the total adjustment to apply to sensor_actual.
         Positive = reduce battery discharge
         Negative = increase battery discharge
@@ -1484,39 +1589,48 @@ class ChargeDischargeController:
         excluded_devices = self.config_entry.data.get("excluded_devices", [])
         if not excluded_devices:
             return 0.0
-        
+
+        is_charging = self.previous_power >= 0
+
         total_adjustment = 0.0
         for device in excluded_devices:
             power_sensor = device.get("power_sensor")
             if not power_sensor:
                 continue
-            
+
             state = self.hass.states.get(power_sensor)
             if state is None or state.state in ("unknown", "unavailable"):
                 _LOGGER.debug("Excluded device sensor %s not available", power_sensor)
                 continue
-            
+
             try:
                 device_power = float(state.state)
                 included_in_consumption = device.get("included_in_consumption", True)
                 allow_solar_surplus = device.get("allow_solar_surplus", False)
-                
+
                 if included_in_consumption:
                     # Device IS in home sensor → SUBTRACT (don't power from battery)
                     if allow_solar_surplus:
-                        adjustment = min(device_power, max(0, current_grid_power))
-                        total_adjustment += adjustment
-                        current_grid_power -= adjustment
-                        _LOGGER.debug("Excluded device %s consuming %.1fW (solar surplus allowed, adjusting by %.1fW)", 
-                                    power_sensor, device_power, adjustment)
+                        if is_charging:
+                            # Battery is charging: do NOT adjust. PD must see real grid
+                            # to reduce charging and leave solar for the device.
+                            _LOGGER.debug("Excluded device %s consuming %.1fW (solar surplus, battery charging → no adjustment)",
+                                        power_sensor, device_power)
+                        else:
+                            # Battery is discharging: full exclusion so battery won't
+                            # discharge to power this device.
+                            total_adjustment += device_power
+                            current_grid_power -= device_power
+                            _LOGGER.debug("Excluded device %s consuming %.1fW (solar surplus, battery discharging → full exclusion)",
+                                        power_sensor, device_power)
                     else:
                         total_adjustment += device_power
-                        _LOGGER.debug("Excluded device %s consuming %.1fW (included in consumption, SUBTRACTING)", 
+                        _LOGGER.debug("Excluded device %s consuming %.1fW (included in consumption, SUBTRACTING)",
                                     power_sensor, device_power)
                 else:
                     # Device is NOT in home sensor → ADD (power from battery)
                     total_adjustment -= device_power
-                    _LOGGER.debug("Additional device %s consuming %.1fW (NOT in consumption, ADDING)", 
+                    _LOGGER.debug("Additional device %s consuming %.1fW (NOT in consumption, ADDING)",
                                     power_sensor, device_power)
             except (ValueError, TypeError):
                 _LOGGER.warning("Could not parse device sensor %s: %s", power_sensor, state.state)
@@ -1859,6 +1973,9 @@ class ChargeDischargeController:
             
             # Update previous_sensor for next cycle
             self.previous_sensor = sensor_filtered
+            # NOTE: Do NOT clear load sharing state here. Batteries keep executing
+            # their last command during deadband, so the active battery lists must
+            # remain accurate for the diagnostic sensor.
             return
         
         # Use filtered sensor directly - it shows the real grid imbalance we need to correct
@@ -1910,6 +2027,8 @@ class ChargeDischargeController:
                 self.previous_error = -(sensor_actual - active_target)
                 self.last_output_sign = 0
                 self.sign_changes = 0
+                self._active_discharge_batteries = []
+                self._active_charge_batteries = []
                 # Set all batteries to 0
                 for coordinator in self.coordinators:
                     await self._set_battery_power(coordinator, 0, 0)
@@ -1919,26 +2038,29 @@ class ChargeDischargeController:
 
             if not available_batteries:
                 _LOGGER.debug("ChargeDischargeController: No available batteries for initial setup.")
+                self._active_discharge_batteries = []
+                self._active_charge_batteries = []
                 return
 
-            # Distribute initial power respecting individual battery limits
-            power_allocation = self._distribute_power_by_limits(abs(self.previous_power), available_batteries, is_charging)
+            # Select batteries via load sharing, then distribute power
+            selected_batteries = self._select_batteries_for_operation(abs(self.previous_power), available_batteries, is_charging)
+            power_allocation = self._distribute_power_by_limits(abs(self.previous_power), selected_batteries, is_charging)
 
             total_allocated = sum(power_allocation.values())
             _LOGGER.info("ChargeDischargeController: Setting initial power to %dW across %d batteries: %s",
-                        total_allocated, len(available_batteries),
+                        total_allocated, len(selected_batteries),
                         {c.name: p for c, p in power_allocation.items()})
 
-            for coordinator in available_batteries:
+            for coordinator in selected_batteries:
                 power = power_allocation.get(coordinator, 0)
                 if is_charging:
                     await self._set_battery_power(coordinator, power, 0)
                 else:
                     await self._set_battery_power(coordinator, 0, power)
 
-            # Set remaining batteries (over capacity) to 0
+            # Set all other batteries to 0 (non-available + available-but-not-selected)
             for coordinator in self.coordinators:
-                if coordinator not in available_batteries:
+                if coordinator not in selected_batteries:
                     await self._set_battery_power(coordinator, 0, 0)
 
             # Reset PD state for clean start (CRITICAL: clear saturated integral)
@@ -2099,7 +2221,9 @@ class ChargeDischargeController:
                 _LOGGER.info("ChargeDischargeController: Discharging NOT ALLOWED by time slot configuration - controller paused")
             new_power = 0
             is_charging = False  # Reset since we're forcing to 0
-        
+            self._active_discharge_batteries = []
+            self._active_charge_batteries = []
+
         # Get available batteries (after checking restrictions to determine correct operation mode)
         available_batteries = self._get_available_batteries(is_charging)
         
@@ -2114,11 +2238,12 @@ class ChargeDischargeController:
             max_total_charge = 0
         
         # Clamp new_power to realistic limits (only if not already restricted to 0)
+        # Convention: new_power > 0 = charging, new_power < 0 = discharging
         if not operation_restricted and new_power != 0:
-            if new_power > max_total_discharge:
-                new_power = max_total_discharge
-            elif new_power < -max_total_charge:
-                new_power = -max_total_charge
+            if new_power > max_total_charge:
+                new_power = max_total_charge
+            elif new_power < -max_total_discharge:
+                new_power = -max_total_discharge
         
         _LOGGER.debug("ChargeDischargeController: sensor_actual=%fW, previous_power=%fW, new_power=%fW (available: %d batteries)",
                      sensor_actual, self.previous_power, new_power, len(available_batteries))
@@ -2129,27 +2254,30 @@ class ChargeDischargeController:
                 await self._set_battery_power(coordinator, 0, 0)
             self.previous_power = 0
             self.previous_sensor = sensor_actual
+            self._active_discharge_batteries = []
+            self._active_charge_batteries = []
             return
         
-        # Distribute power respecting individual battery limits
-        power_allocation = self._distribute_power_by_limits(abs(new_power), available_batteries, is_charging)
+        # Select batteries via load sharing, then distribute power
+        selected_batteries = self._select_batteries_for_operation(abs(new_power), available_batteries, is_charging)
+        power_allocation = self._distribute_power_by_limits(abs(new_power), selected_batteries, is_charging)
 
         total_allocated = sum(power_allocation.values())
         _LOGGER.debug("ChargeDischargeController: Setting power to %dW total across %d batteries: %s",
-                      total_allocated, len(available_batteries),
+                      total_allocated, len(selected_batteries),
                       {c.name: p for c, p in power_allocation.items()})
 
-        # Write to available batteries
-        for coordinator in available_batteries:
+        # Write to selected batteries
+        for coordinator in selected_batteries:
             power = power_allocation.get(coordinator, 0)
             if is_charging:
                 await self._set_battery_power(coordinator, power, 0)
             else:
                 await self._set_battery_power(coordinator, 0, power)
-        
-        # Set remaining batteries to 0
+
+        # Set all other batteries to 0 (non-available + available-but-not-selected)
         for coordinator in self.coordinators:
-            if coordinator not in available_batteries:
+            if coordinator not in selected_batteries:
                 await self._set_battery_power(coordinator, 0, 0)
         
         # Update state for next cycle

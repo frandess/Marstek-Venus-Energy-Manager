@@ -55,6 +55,11 @@ async def async_setup_entry(
     # Add discharge window diagnostic sensor (always, even without slots)
     entities.append(DischargeWindowSensor(hass, entry))
 
+    # Add active batteries diagnostic sensor (only with multiple batteries)
+    controller = hass.data[DOMAIN][entry.entry_id].get("controller")
+    if controller and len(coordinators) > 1:
+        entities.append(ActiveBatteriesSensor(hass, entry, controller, coordinators))
+
     async_add_entities(entities)
 
 
@@ -246,6 +251,76 @@ class DischargeWindowSensor(SensorEntity):
             attrs[f"slot_{n}_enabled"] = slot.get("enabled", True)
             attrs[f"slot_{n}_apply_to_charge"] = slot.get("apply_to_charge", False)
             attrs[f"slot_{n}_target_grid_power"] = f"{slot.get('target_grid_power', 0)} W"
+
+        return attrs
+
+    @property
+    def device_info(self):
+        """Return device information for the system."""
+        return {
+            "identifiers": {(DOMAIN, "marstek_venus_system")},
+            "name": "Marstek Venus System",
+            "manufacturer": "Marstek",
+            "model": "Venus Multi-Battery System",
+        }
+
+
+class ActiveBatteriesSensor(SensorEntity):
+    """Diagnostic sensor showing which batteries are currently active in load sharing."""
+
+    def __init__(
+        self, hass: HomeAssistant, entry: ConfigEntry, controller, coordinators: list
+    ) -> None:
+        """Initialize the active batteries sensor."""
+        self.hass = hass
+        self.entry = entry
+        self.controller = controller
+        self._coordinators = coordinators
+
+        self._attr_name = "Active Batteries"
+        self._attr_unique_id = f"{entry.entry_id}_active_batteries"
+        self._attr_icon = "mdi:battery-sync"
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        self._attr_should_poll = True
+
+    @property
+    def native_value(self) -> str:
+        """Return a summary of active batteries."""
+        discharge = self.controller._active_discharge_batteries
+        charge = self.controller._active_charge_batteries
+
+        if discharge:
+            names = ", ".join(c.name for c in discharge)
+            return f"Discharging: {names}"
+        elif charge:
+            names = ", ".join(c.name for c in charge)
+            return f"Charging: {names}"
+        return "Idle"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return detailed load sharing state."""
+        discharge = self.controller._active_discharge_batteries
+        charge = self.controller._active_charge_batteries
+        total = len(self._coordinators)
+
+        attrs = {
+            "total_batteries": total,
+            "discharge_active": len(discharge),
+            "discharge_batteries": [c.name for c in discharge],
+            "charge_active": len(charge),
+            "charge_batteries": [c.name for c in charge],
+        }
+
+        # Add per-battery SOC and lifetime energy for context
+        for c in self._coordinators:
+            if c.data:
+                soc = c.data.get("battery_soc", "N/A")
+                discharge_kwh = c.data.get("total_discharging_energy", "N/A")
+                charge_kwh = c.data.get("total_charging_energy", "N/A")
+                attrs[f"{c.name}_soc"] = f"{soc}%"
+                attrs[f"{c.name}_total_discharged"] = f"{discharge_kwh} kWh"
+                attrs[f"{c.name}_total_charged"] = f"{charge_kwh} kWh"
 
         return attrs
 

@@ -295,6 +295,8 @@ class ManualModeSwitch(SwitchEntity):
         self.controller.error_integral = 0.0
         self.controller.previous_error = 0.0
         self.controller.sign_changes = 0
+        self.controller._active_discharge_batteries = []
+        self.controller._active_charge_batteries = []
 
         _LOGGER.info("Manual Mode DISABLED - resuming automatic control")
 
