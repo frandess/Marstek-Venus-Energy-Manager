@@ -108,8 +108,20 @@ class MarstekVenusNumber(CoordinatorEntity, NumberEntity):
         elif self.definition['key'] == 'discharging_cutoff_capacity':
             old_min_soc = self.coordinator.min_soc
             self.coordinator.min_soc = value
-            _LOGGER.info("%s: Updated min_soc %.1f%% → %.1f%% (immediate sync)", 
+            _LOGGER.info("%s: Updated min_soc %.1f%% → %.1f%% (immediate sync)",
                          self.coordinator.name, old_min_soc, value)
+
+        elif self.definition['key'] == 'max_charge_power':
+            old_value = self.coordinator.max_charge_power
+            self.coordinator.max_charge_power = int(value)
+            _LOGGER.info("%s: Updated max_charge_power %dW → %dW (immediate sync)",
+                         self.coordinator.name, old_value, int(value))
+
+        elif self.definition['key'] == 'max_discharge_power':
+            old_value = self.coordinator.max_discharge_power
+            self.coordinator.max_discharge_power = int(value)
+            _LOGGER.info("%s: Updated max_discharge_power %dW → %dW (immediate sync)",
+                         self.coordinator.name, old_value, int(value))
 
     @property
     def device_info(self):
