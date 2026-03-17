@@ -106,6 +106,11 @@ class ChargeDischargeController:
 
         # Last output sign for directional hysteresis
         self.last_output_sign = 0        # Track last output direction (1=charge, -1=discharge, 0=idle)
+
+        # Stale sensor detection
+        self._last_sensor_update_time = None    # datetime of last real sensor change (HA last_updated)
+        self._stale_cycles = 0                  # consecutive cycles without sensor change
+        self._max_stale_cycles = 15             # safety valve: ~30s before forcing recalculation
         
         # Calculate dynamic anti-windup limits based on total system capacity
         self.max_charge_capacity = sum(c.max_charge_power for c in coordinators)
@@ -2374,13 +2379,37 @@ class ChargeDischargeController:
             _LOGGER.warning(f"Could not parse consumption sensor state: {consumption_state.state}")
             return
         
-        # Add to sensor history for moving average filter
-        self.sensor_history.append(sensor_raw)
-        if len(self.sensor_history) > self.sensor_history_size:
-            self.sensor_history.pop(0)  # Remove oldest
-        
+        # Detect if sensor has actually updated since last cycle
+        sensor_update_time = consumption_state.last_updated
+        is_stale = (
+            self._last_sensor_update_time is not None
+            and sensor_update_time == self._last_sensor_update_time
+        )
+        previous_update_time = self._last_sensor_update_time
+        self._last_sensor_update_time = sensor_update_time
+
+        if is_stale:
+            self._stale_cycles += 1
+            if self._stale_cycles <= self._max_stale_cycles:
+                _LOGGER.debug(
+                    "ChargeDischargeController: Sensor stale (cycle %d/%d), maintaining last command %.1fW",
+                    self._stale_cycles, self._max_stale_cycles, self.previous_power
+                )
+                return
+            else:
+                _LOGGER.debug(
+                    "ChargeDischargeController: Sensor stale for %d cycles (~%.0fs). Safety recalculation.",
+                    self._stale_cycles, self._stale_cycles * 2.0
+                )
+        else:
+            self._stale_cycles = 0
+            # Add to sensor history ONLY on real updates
+            self.sensor_history.append(sensor_raw)
+            if len(self.sensor_history) > self.sensor_history_size:
+                self.sensor_history.pop(0)
+
         # Use moving average to smooth out instantaneous spikes
-        sensor_filtered = sum(self.sensor_history) / len(self.sensor_history)
+        sensor_filtered = sum(self.sensor_history) / len(self.sensor_history) if self.sensor_history else sensor_raw
 
         # Get active time slot parameters (target grid power)
         active_slot = self._get_active_slot()
@@ -2562,8 +2591,17 @@ class ChargeDischargeController:
             # Integral disabled - ensure it stays at zero
             self.error_integral = 0.0
         
-        # Calculate derivative (rate of change of error)
-        error_derivative = (error - self.previous_error) / self.dt
+        # Calculate derivative using real elapsed time between sensor updates
+        if self._stale_cycles > self._max_stale_cycles:
+            # Safety valve: suppress derivative to avoid spike from stale data
+            real_dt = self.dt
+            error_derivative = 0.0
+        elif previous_update_time is not None:
+            real_dt = max(1.0, min((sensor_update_time - previous_update_time).total_seconds(), 30.0))
+            error_derivative = (error - self.previous_error) / real_dt
+        else:
+            real_dt = self.dt
+            error_derivative = (error - self.previous_error) / real_dt
         
         # PID terms
         P = self.kp * error

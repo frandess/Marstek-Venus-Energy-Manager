@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.4] - 2026-03-17
+
+### Improved
+- **Stale sensor detection for PD controller**: The control loop now detects when the consumption sensor hasn't updated between cycles (common with sensors reporting every 5s or slower) and skips PD recalculation to avoid acting on stale data. Sensor history is only populated with real readings, preventing duplicate values from diluting the moving average. The derivative term now uses the actual elapsed time between sensor updates instead of a fixed 2s, eliminating derivative spikes that caused oscillation with slow sensors. A safety valve forces recalculation (proportional only, derivative suppressed) if the sensor stops updating for ~30 seconds.
+
 ## [1.3.3] - 2026-03-17
 
 ### Fixed
