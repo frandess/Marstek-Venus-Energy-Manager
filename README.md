@@ -50,7 +50,7 @@ This is the primary operating mode of the integration, designed to maximize self
 ### 3. Additional Management Features
 *   **Real-time Monitoring**: View battery SOC, power flow, voltage, current, temperature, and cell-level health.
 *   **Multi-Battery Support**: Seamlessly manage up to 4 batteries as a single aggregated system.
-*   **No-Discharge Time Slots**: Prevent battery discharge during specific times (e.g., peak grid rates). Each slot supports configurable **target grid power**, **minimum charge power**, and **minimum discharge power**.
+*   **Discharge Time Slots**: Allow the battery to discharge during specific times (e.g., peak grid rates). Each slot supports configurable **target grid power**, **minimum charge power**, and **minimum discharge power**.
 *   **Weekly Full Charge**: Option to force a full charge once a week for cell balancing.
 *   **Load Exclusion**: "Hide" specific heavy loads (like EV chargers) from the battery to prevent rapid draining.
 
@@ -107,7 +107,7 @@ This integration is configured entirely via the Home Assistant UI.
     *   **Charge Hysteresis**: (Optional) Prevent rapid cycling near the charge limit.
 
 ### 4. Time Slots (Optional)
-You can define specific time periods where the battery is **forbidden from discharging**. This is useful for saving battery power for evening peaks or overnight usage. Each time slot also supports advanced per-slot controller parameters.
+You can define specific time periods where the battery is **allowed to discharge**. This is useful for saving battery power for evening peaks or overnight usage. Each time slot also supports advanced per-slot controller parameters.
 *   **Enable**: Check "Configure time slots".
 *   **Add Slot**:
     *   **Start/End Time**: Define the window (e.g., `14:00` to `18:00`).
