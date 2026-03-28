@@ -2692,8 +2692,105 @@ class ChargeDischargeController:
         hours = deficit_kwh / (effective_power_kw * CHARGE_EFFICIENCY)
         return math.ceil(hours * 2) / 2  # Round up to nearest 0.5h
 
+    def _select_cheapest_blocks(self, slots: list, hours_needed: float, slot_duration_h: float) -> list:
+        """Select cheapest slots using a block strategy for sub-hourly granularity.
+
+        Groups consecutive slots into 1-hour blocks (e.g. 4 × 15-min slots).
+        Selects the cheapest block first, then the next cheapest, etc.
+        Any remainder hours (e.g. 0.5h) use the cheapest consecutive sub-block
+        of the appropriate size from the remaining slots.
+
+        Args:
+            slots: list[PriceSlot] already filtered (future + threshold)
+            hours_needed: fractional hours of charging needed
+            slot_duration_h: duration of each slot in hours (e.g. 0.25 for 15-min)
+
+        Returns:
+            Sorted (by start time) list of selected PriceSlot
+        """
+        block_size = max(1, round(1.0 / slot_duration_h))  # 4 for 15-min slots
+        sorted_slots = sorted(slots, key=lambda s: s.start)
+        n = len(sorted_slots)
+
+        full_blocks_needed = int(hours_needed)
+        remainder_slots_needed = round((hours_needed - full_blocks_needed) / slot_duration_h)
+
+        def find_cheapest_window(available: list, window_size: int):
+            """Return indices (into sorted_slots) of the cheapest time-consecutive window."""
+            best_avg = float("inf")
+            best_window = None
+            for i in range(len(available) - window_size + 1):
+                candidate = available[i:i + window_size]
+                # Verify slots are time-consecutive (gap <= 1 min tolerance)
+                consecutive = all(
+                    abs((sorted_slots[candidate[j + 1]].start - sorted_slots[candidate[j]].end).total_seconds()) < 60
+                    for j in range(len(candidate) - 1)
+                )
+                if not consecutive:
+                    continue
+                avg = sum(sorted_slots[idx].price for idx in candidate) / window_size
+                # Prefer lower price; break ties by earlier start time
+                if avg < best_avg or (avg == best_avg and best_window is not None and
+                        sorted_slots[candidate[0]].start < sorted_slots[best_window[0]].start):
+                    best_avg = avg
+                    best_window = list(candidate)
+            return best_window
+
+        available = list(range(n))
+        selected_indices = []
+
+        # Select full 1-hour blocks
+        for block_num in range(full_blocks_needed):
+            window = find_cheapest_window(available, block_size)
+            if window is None:
+                _LOGGER.warning(
+                    "Dynamic pricing: no consecutive block of %d slots available for block %d/%d, "
+                    "falling back to cheapest individual slots",
+                    block_size, block_num + 1, full_blocks_needed
+                )
+                # Fall back: pick cheapest individual available slots for this block
+                by_price = sorted(available, key=lambda i: sorted_slots[i].price)
+                take = min(block_size, len(by_price))
+                window = by_price[:take]
+
+            selected_indices.extend(window)
+            for idx in window:
+                available.remove(idx)
+
+        # Select partial block (remainder)
+        if remainder_slots_needed > 0 and available:
+            window = find_cheapest_window(available, remainder_slots_needed)
+            if window is None:
+                _LOGGER.warning(
+                    "Dynamic pricing: no consecutive window of %d slots for remainder, "
+                    "falling back to cheapest individual slots",
+                    remainder_slots_needed
+                )
+                by_price = sorted(available, key=lambda i: sorted_slots[i].price)
+                window = by_price[:remainder_slots_needed]
+            selected_indices.extend(window)
+
+        hours_accumulated = len(selected_indices) * slot_duration_h
+        if hours_accumulated < hours_needed:
+            _LOGGER.warning(
+                "Dynamic pricing: only %.1fh selected in blocks, needed %.1fh "
+                "(threshold may be too low or not enough consecutive slots)",
+                hours_accumulated, hours_needed
+            )
+
+        _LOGGER.info(
+            "Dynamic pricing (block strategy): %d blocks × %d slots + %d remainder slots selected "
+            "(%.1fh total, slot_duration=%.2fh)",
+            full_blocks_needed, block_size, remainder_slots_needed,
+            hours_accumulated, slot_duration_h
+        )
+        return sorted([sorted_slots[i] for i in selected_indices], key=lambda s: s.start)
+
     def _select_cheapest_hours(self, slots: list, hours_needed: float) -> list:
         """Filter slots by max_price_threshold, sort by price, return cheapest N.
+
+        For sub-hourly granularity (e.g. 15-min slots) dispatches to
+        _select_cheapest_blocks to avoid scattered fragmented charging windows.
 
         Args:
             slots: list[PriceSlot] available in next 24h
@@ -2719,10 +2816,14 @@ class ChargeDischargeController:
             _LOGGER.warning("Dynamic pricing: no slots available after filtering")
             return []
 
-        # Sort by price ascending, then by start time for tie-breaking
+        # Dispatch to block strategy for sub-hourly granularity
+        slot_duration_h = (future_slots[0].end - future_slots[0].start).total_seconds() / 3600.0
+        if slot_duration_h < 0.9:
+            return self._select_cheapest_blocks(future_slots, hours_needed, slot_duration_h)
+
+        # Hourly slots: sort by price, accumulate until hours_needed is met
         sorted_slots = sorted(future_slots, key=lambda s: (s.price, s.start))
 
-        # Select cheapest N hours (each slot = 1h unless partial at boundaries)
         selected = []
         hours_accumulated = 0.0
         for slot in sorted_slots:
