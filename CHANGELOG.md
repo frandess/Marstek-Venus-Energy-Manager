@@ -3,6 +3,7 @@
 ## [1.5.1] - 2026-03-28
 
 ### Added
+- **Improved daily consumption estimate when battery reaches min SOC**: The system now tracks grid energy imported during periods when all batteries are at minimum SOC and the battery would otherwise be discharging (within a configured discharge slot, or always if no slots are defined). This unmet demand is accumulated in a new sensor (`Grid at Min SOC`, kWh, resets at midnight) and added to the battery discharge when capturing the daily consumption figure used by predictive charging. This prevents the 7-day rolling average from underestimating consumption on days where the battery ran out before midnight, which previously caused the system to charge less than needed the following day. Grid import during intentional grid charging (predictive/dynamic pricing) is excluded from the accumulator.
 - **Mid-day re-evaluation for dynamic pricing slots**: When multiple cheap slots are selected at 00:05, the system now re-evaluates 1 hour before each subsequent slot whether charging is still needed. If the battery is sufficiently charged (solar + current SOC covers expected consumption), the slot is silently skipped. If charging is still needed, a notification is sent confirming the slot will activate. Re-evaluations are skipped automatically when a previous slot is still actively charging (back-to-back slots), and the per-day state is reset at midnight alongside the main schedule.
 
 ### Fixed
