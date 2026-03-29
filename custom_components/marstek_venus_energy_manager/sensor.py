@@ -19,7 +19,7 @@ from .const import (
     CONF_ENABLE_WEEKLY_FULL_CHARGE_DELAY,
 )
 from .coordinator import MarstekVenusDataUpdateCoordinator
-from .aggregate_sensors import AGGREGATE_SENSOR_DEFINITIONS, MarstekVenusAggregateSensor
+from .aggregate_sensors import AGGREGATE_SENSOR_DEFINITIONS, MarstekVenusAggregateSensor, DailyGridAtMinSocSensor
 from .calculated_sensors import MarstekVenusEfficiencySensor, MarstekVenusStoredEnergySensor, MarstekVenusCycleSensor
 
 _LOGGER = logging.getLogger(__name__)
@@ -93,6 +93,10 @@ async def async_setup_entry(
     # Add non-responsive batteries sensor (always, when controller is present)
     if controller:
         entities.append(NonResponsiveBatteriesSensor(hass, entry, controller, coordinators))
+
+    # Add daily grid-at-min-soc energy sensor (feeds into consumption estimation)
+    if controller:
+        entities.append(DailyGridAtMinSocSensor(controller))
 
     async_add_entities(entities)
 

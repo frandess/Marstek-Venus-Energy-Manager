@@ -592,6 +592,7 @@
       "system_stored_energy": { "name": "Systeem Opgeslagen Energie" },
       "system_daily_charging_energy": { "name": "Dagelijkse Systeem Laadenergie" },
       "system_daily_discharging_energy": { "name": "Dagelijkse Systeem Ontlaadenergie" },
+      "system_daily_grid_at_min_soc_energy": { "name": "Net bij Min. SOC" },
       "device_name": { "name": "Apparaatnaam" },
       "sn_code": { "name": "Serienummer" },
       "software_version": { "name": "Softwareversie" },

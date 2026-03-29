@@ -192,6 +192,10 @@ class ChargeDischargeController:
         # Persistent store for consumption history (survives restarts AND reloads)
         self._consumption_store = Store(hass, 1, f"{DOMAIN}_consumption_history")
 
+        # Grid import accumulator when batteries are at min_soc during discharge window
+        self._daily_grid_at_min_soc_kwh = 0.0
+        self._grid_at_min_soc_sensor = None  # Reference to HA sensor entity for state push
+
         # Manual mode state
         self.manual_mode_enabled = config_entry.data.get(CONF_MANUAL_MODE_ENABLED, False)
 
@@ -1431,9 +1435,11 @@ class ChargeDischargeController:
         """Capture daily consumption from HA history for a specific date.
 
         Gets the maximum value from the target date (final reading before reset).
+        Also queries the grid-at-min-soc sensor and sums both values to get the
+        full daily consumption estimate (battery discharge + unmet demand).
 
         Args:
-            entity_id: Entity ID of the daily sensor
+            entity_id: Entity ID of the daily discharge sensor
             target_date: Date to capture data for
         """
         from datetime import date, datetime, timedelta
@@ -1488,20 +1494,50 @@ class ChargeDischargeController:
                 state_count, max_value, entity_id, target_date
             )
 
-            if max_value >= 1.5:
+            # Also query the grid-at-min-soc sensor for this date and add it
+            grid_min_soc_entity_id = "sensor.marstek_venus_system_daily_grid_at_min_soc_energy"
+            grid_min_soc_value = 0.0
+            try:
+                grid_states = await recorder_instance.async_add_executor_job(
+                    history.state_changes_during_period,
+                    self.hass,
+                    start_time,
+                    end_time,
+                    grid_min_soc_entity_id
+                )
+                if grid_min_soc_entity_id in grid_states:
+                    for state in grid_states[grid_min_soc_entity_id]:
+                        if state.state not in ['unknown', 'unavailable']:
+                            try:
+                                grid_min_soc_value = max(grid_min_soc_value, float(state.state))
+                            except (ValueError, TypeError):
+                                continue
+            except Exception as grid_err:
+                _LOGGER.debug(
+                    "Could not query grid-at-min-soc history for %s: %s", target_date, grid_err
+                )
+
+            total_value = max_value + grid_min_soc_value
+            if grid_min_soc_value > 0:
+                _LOGGER.debug(
+                    "Backfill grid-at-min-soc for %s: +%.3f kWh → total=%.3f kWh",
+                    target_date, grid_min_soc_value, total_value,
+                )
+
+            if total_value >= 1.5:
                 # Replace existing entry for this date (including defaults) or append
                 replaced = False
                 for i, (d, c) in enumerate(self._daily_consumption_history):
                     if d == target_date:
-                        self._daily_consumption_history[i] = (target_date, max_value)
+                        self._daily_consumption_history[i] = (target_date, total_value)
                         replaced = True
                         break
                 if not replaced:
-                    self._daily_consumption_history.append((target_date, max_value))
+                    self._daily_consumption_history.append((target_date, total_value))
 
                 _LOGGER.info(
                     "Captured daily consumption from history: %.1f kWh for %s (%s, history: %d days)",
-                    max_value, target_date,
+                    total_value, target_date,
                     "replaced default" if replaced else "new entry",
                     len(self._daily_consumption_history)
                 )
@@ -1574,12 +1610,27 @@ class ChargeDischargeController:
         )
 
         # Also capture today's running total from coordinators if available
+        # Restore grid-at-min-soc accumulator from HA entity state (survives HA restart)
+        grid_min_soc_entity_id = "sensor.marstek_venus_system_daily_grid_at_min_soc_energy"
+        grid_min_soc_state = self.hass.states.get(grid_min_soc_entity_id)
+        if grid_min_soc_state and grid_min_soc_state.state not in ("unknown", "unavailable", None):
+            try:
+                restored = float(grid_min_soc_state.state)
+                if restored > 0:
+                    self._daily_grid_at_min_soc_kwh = restored
+                    _LOGGER.info(
+                        "Startup backfill: restored grid-at-min-soc accumulator: %.3f kWh",
+                        restored,
+                    )
+            except (ValueError, TypeError):
+                pass
+
         coordinators_with_data = [c for c in self.coordinators if c.data]
         if coordinators_with_data:
             today_value = sum(
                 c.data.get("total_daily_discharging_energy", 0)
                 for c in coordinators_with_data
-            )
+            ) + self._daily_grid_at_min_soc_kwh
             if today_value >= 1.5:
                 # Replace today's default with current running total
                 for i, (d, c) in enumerate(self._daily_consumption_history):
@@ -1693,7 +1744,7 @@ class ChargeDischargeController:
             current_value = sum(
                 c.data.get("total_daily_discharging_energy", 0)
                 for c in coordinators_with_data
-            )
+            ) + self._daily_grid_at_min_soc_kwh
 
             # Only capture if we have meaningful data (>= 1.5 kWh)
             if current_value < 1.5:
@@ -1733,6 +1784,16 @@ class ChargeDischargeController:
 
         except (ValueError, TypeError) as e:
             _LOGGER.error("Daily consumption capture: Failed to parse sensor value: %s", e)
+
+    async def _reset_daily_grid_at_min_soc(self, _now=None) -> None:
+        """Reset the daily grid-at-min-soc accumulator at midnight."""
+        _LOGGER.debug(
+            "Daily reset: clearing grid-at-min-soc accumulator (was %.3f kWh)",
+            self._daily_grid_at_min_soc_kwh,
+        )
+        self._daily_grid_at_min_soc_kwh = 0.0
+        if self._grid_at_min_soc_sensor:
+            self._grid_at_min_soc_sensor.async_write_ha_state()
 
     async def _should_activate_grid_charging(self) -> dict:
         """
@@ -4001,7 +4062,30 @@ class ChargeDischargeController:
         
         _LOGGER.debug("ChargeDischargeController: sensor_actual=%fW, previous_power=%fW, new_power=%fW (available: %d batteries)",
                      sensor_actual, self.previous_power, new_power, len(available_batteries))
-        
+
+        # GRID-AT-MIN-SOC ACCUMULATOR: track grid import that the battery couldn't cover
+        # Conditions:
+        #   - All reachable batteries are at/below min_soc (system truly depleted for discharge)
+        #   - Not intentionally grid-charging (predictive/dynamic pricing)
+        #   - Within a discharge window (inside a timeslot, or no timeslots configured)
+        #   - Grid is importing (sensor_actual > 0)
+        discharge_available = self._get_available_batteries(is_charging=False)
+        has_reachable = any(c.is_available for c in self.coordinators)
+        all_at_min_soc = (len(discharge_available) == 0) and has_reachable
+        if all_at_min_soc and not self.grid_charging_active and sensor_actual > 0:
+            time_slots = self.config_entry.data.get("no_discharge_time_slots", [])
+            in_discharge_window = (not time_slots) or (self._get_active_slot() is not None)
+            if in_discharge_window:
+                # sensor_actual is in W; cycle is ~2.5 s → convert to kWh
+                interval_kwh = sensor_actual * 2.5 / 3_600_000
+                self._daily_grid_at_min_soc_kwh += interval_kwh
+                if self._grid_at_min_soc_sensor:
+                    self._grid_at_min_soc_sensor.async_write_ha_state()
+                _LOGGER.debug(
+                    "Grid-at-min-soc: +%.4f kWh (grid=%.0fW), daily total=%.3f kWh",
+                    interval_kwh, sensor_actual, self._daily_grid_at_min_soc_kwh,
+                )
+
         if not available_batteries:
             _LOGGER.debug("ChargeDischargeController: No available batteries, setting all to 0.")
             for coordinator in self.coordinators:
@@ -4324,6 +4408,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             )
         )
         _LOGGER.info("Daily consumption capture scheduled at 23:55 local time")
+
+    # Schedule midnight reset for the grid-at-min-soc daily accumulator
+    if controller:
+        entry.async_on_unload(
+            async_track_time_change(
+                hass, controller._reset_daily_grid_at_min_soc, hour=0, minute=0, second=5
+            )
+        )
 
     # Schedule solar forecast capture at 23:00 every night for charge delay
     if controller.charge_delay_enabled:
