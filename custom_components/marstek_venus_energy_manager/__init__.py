@@ -1365,7 +1365,7 @@ class ChargeDischargeController:
             data = await self._consumption_store.async_load()
             if data and "history" in data and data["history"]:
                 self._daily_consumption_history = [
-                    (date.fromisoformat(date_str), consumption)
+                    (date.fromisoformat(date_str), round(consumption, 2))
                     for date_str, consumption in data["history"]
                 ]
                 _LOGGER.info(
@@ -4207,7 +4207,7 @@ async def _restore_consumption_history(hass: HomeAssistant, entry: ConfigEntry, 
     try:
         # Convert stored data back to list of tuples with date objects
         controller._daily_consumption_history = [
-            (date.fromisoformat(date_str), consumption)
+            (date.fromisoformat(date_str), round(consumption, 2))
             for date_str, consumption in history_data
         ]
         
