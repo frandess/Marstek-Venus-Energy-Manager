@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.5.1-b2] - Unreleased
+## [1.5.1] - 2026-03-29
 
 ### Added
 - **Improved daily consumption estimate when battery reaches min SOC**: The system now tracks grid energy imported during periods when all batteries are at minimum SOC and the battery would otherwise be discharging (within a configured discharge slot, or always if no slots are defined). This unmet demand is accumulated in a new sensor (`Grid at Min SOC`, kWh, resets at midnight) and added to the battery discharge when capturing the daily consumption figure used by predictive charging. This prevents the 7-day rolling average from underestimating consumption on days where the battery ran out before midnight, which previously caused the system to charge less than needed the following day. Grid import during intentional grid charging (predictive/dynamic pricing) is excluded from the accumulator.
@@ -12,6 +12,7 @@
 - **Daily consumption history values stored with excessive decimal places**: Values in the 7-day rolling average could be stored with 15+ decimal digits (e.g. `1.6099999999999999`) due to floating-point accumulation in the grid-at-min-SOC counter and integer division when computing the gap-fill average. All values written to the history are now rounded to 2 decimal places, consistent with the other daily energy sensors.
 - **Modbus read/write operations now time out on half-open sockets**: `async_read_register` and `async_write_register` now wrap their underlying pymodbus calls in `asyncio.wait_for(timeout=...)` using the client's configured timeout (default 10 s). Previously, a hung write or read on a half-open socket would block indefinitely, preventing the coordinator from recovering after a TCP connection drop. `asyncio.TimeoutError` is now treated the same as `ConnectionException`, triggering the existing reconnect-and-retry path.
 - **Battery SOC hidden by efficiency sensor in device card**: The Round-Trip Efficiency sensor shared the `battery` device class with the Battery SOC sensor, causing Home Assistant to display the efficiency percentage instead of the SOC in the top-right corner of the device card. The device class has been removed from the efficiency sensor.
+- **Grid-at-min-SOC accumulator lost on integration reload**: The daily grid import accumulator (used to correct the consumption estimate) was restored from the HA entity state, which is `unavailable` during a reload. The value is now persisted in the same Store as the consumption history and survives both full HA restarts and integration reloads without losing the day's accumulated value. The accumulator is also saved every ~5 minutes while active, and immediately after the midnight reset.
 
 ### Changed
 - **Clarifying note on solar forecast sensor in secondary configuration steps**: In the Time Slot, Dynamic Pricing, and Charge Delay configuration steps, the solar forecast sensor field now includes a note explaining that it is not required if the sensor was already configured in the initial setup step — it will be used automatically. The German, French, and Dutch translations of the Dynamic Pricing step were also missing this field entirely; it has been added.
