@@ -148,7 +148,7 @@
           "predictive_charging_mode": "Lademodus"
         },
         "data_description": {
-          "predictive_charging_mode": "Zeitfenster: Laden während eines festen Niedrigtarifzeitfensters. Dynamischer Preis: Tägliche Auswahl der günstigsten Stunden basierend auf Nordpool/ENTSO-e Preisen."
+          "predictive_charging_mode": "Zeitfenster: Laden während eines festen Niedrigtarifzeitfensters. Dynamischer Preis: Tägliche Auswahl der günstigsten Stunden basierend auf Nordpool/ENTSO-e Preisen. Echtzeit-Preis: Sofortige Aktivierung der Ladung wenn der Preis unter den Schwellenwert fällt."
         }
       },
       "dynamic_pricing_config": {
@@ -166,6 +166,24 @@
           "price_sensor": "Sensor, der stündliche Strompreise enthält (z.B. sensor.nordpool_kwh_de_eur_3_10_025)",
           "max_price_threshold": "Stunden über diesem Preis werden nicht ausgewählt. Gleiche Einheit wie der Sensor verwenden: ct/kWh für Nordpool, €/kWh für PVPC, Rp/kWh für CKW. Leer lassen, um alle Stunden zu verwenden.",
           "solar_forecast_sensor": "Sensor, der die Solarproduktionsprognose in kWh liefert (z.B. Solcast). Mit Solaranlage: konfigurieren — das System lädt nur dann aus dem Netz, wenn die Solarprognose unzureichend ist. Ohne Solaranlage: leer lassen — das System lädt, wenn die Batterieenergie für den Tag nicht ausreicht. Nicht erforderlich, wenn dieser Sensor bereits im ersten Schritt konfiguriert wurde — er wird automatisch verwendet.",
+          "max_contracted_power": "Gesamt-Vertragsleistung (ICP) in Watt. Das System überschreitet dieses Limit beim Laden nicht, um ein Auslösen der Sicherung zu vermeiden"
+        }
+      },
+      "realtime_price_config": {
+        "title": "Prädiktives Laden — Echtzeit-Preis",
+        "description": "Preissensor und Schwellenwert konfigurieren. Das System liest den aktuellen Preis alle paar Sekunden und startet oder stoppt das Netzladen sofort — ohne tägliche Planung.",
+        "data": {
+          "price_sensor": "Strompreissensor",
+          "max_price_threshold": "Maximaler Preisschwellenwert (optional)",
+          "average_price_sensor": "Tagesdurchschnittspreis-Sensor (optional)",
+          "solar_forecast_sensor": "Solarprognose-Sensor (kWh)",
+          "max_contracted_power": "Maximale Vertragsleistung ICP (W)"
+        },
+        "data_description": {
+          "price_sensor": "Sensor, dessen Zustand der aktuelle Strompreis ist. Jeder Sensor, der den aktuellen Periodenpreis als Zustand anzeigt, funktioniert.",
+          "max_price_threshold": "Laden wird aktiviert, wenn der aktuelle Preis diesen Wert nicht übersteigt. Gleiche Einheit wie der Sensor verwenden. Leer lassen, wenn der Tagesdurchschnittssensor verwendet wird.",
+          "average_price_sensor": "Wenn angegeben, wird dieser Wert als Schwellenwert anstelle des fixen Wertes verwendet. Leer lassen für den fixen Schwellenwert.",
+          "solar_forecast_sensor": "Sensor, der die Solarproduktionsprognose in kWh liefert. Nicht erforderlich, wenn dieser Sensor bereits im ersten Schritt konfiguriert wurde — er wird automatisch verwendet.",
           "max_contracted_power": "Gesamt-Vertragsleistung (ICP) in Watt. Das System überschreitet dieses Limit beim Laden nicht, um ein Auslösen der Sicherung zu vermeiden"
         }
       },
@@ -386,7 +404,7 @@
           "predictive_charging_mode": "Lademodus"
         },
         "data_description": {
-          "predictive_charging_mode": "Zeitfenster: Laden während eines festen Niedrigtarifzeitfensters. Dynamischer Preis: Tägliche Auswahl der günstigsten Stunden basierend auf Nordpool/ENTSO-e Preisen."
+          "predictive_charging_mode": "Zeitfenster: Laden während eines festen Niedrigtarifzeitfensters. Dynamischer Preis: Tägliche Auswahl der günstigsten Stunden basierend auf Nordpool/ENTSO-e Preisen. Echtzeit-Preis: Sofortige Aktivierung der Ladung wenn der Preis unter den Schwellenwert fällt."
         }
       },
       "dynamic_pricing_config": {
@@ -404,6 +422,24 @@
           "price_sensor": "Sensor, der stündliche Strompreise enthält (z.B. sensor.nordpool_kwh_de_eur_3_10_025)",
           "max_price_threshold": "Stunden über diesem Preis werden nicht ausgewählt. Gleiche Einheit wie der Sensor verwenden: ct/kWh für Nordpool, €/kWh für PVPC, Rp/kWh für CKW. Leer lassen, um alle Stunden zu verwenden.",
           "solar_forecast_sensor": "Sensor, der die Solarproduktionsprognose in kWh liefert (z.B. Solcast). Mit Solaranlage: konfigurieren — das System lädt nur dann aus dem Netz, wenn die Solarprognose unzureichend ist. Ohne Solaranlage: leer lassen — das System lädt, wenn die Batterieenergie für den Tag nicht ausreicht. Nicht erforderlich, wenn dieser Sensor bereits im ersten Schritt konfiguriert wurde — er wird automatisch verwendet.",
+          "max_contracted_power": "Gesamt-Vertragsleistung (ICP) in Watt. Das System überschreitet dieses Limit beim Laden nicht, um ein Auslösen der Sicherung zu vermeiden"
+        }
+      },
+      "realtime_price_config": {
+        "title": "Prädiktives Laden — Echtzeit-Preis",
+        "description": "Preissensor und Schwellenwert konfigurieren. Das System liest den aktuellen Preis alle paar Sekunden und startet oder stoppt das Netzladen sofort — ohne tägliche Planung.",
+        "data": {
+          "price_sensor": "Strompreissensor",
+          "max_price_threshold": "Maximaler Preisschwellenwert (optional)",
+          "average_price_sensor": "Tagesdurchschnittspreis-Sensor (optional)",
+          "solar_forecast_sensor": "Solarprognose-Sensor (kWh)",
+          "max_contracted_power": "Maximale Vertragsleistung ICP (W)"
+        },
+        "data_description": {
+          "price_sensor": "Sensor, dessen Zustand der aktuelle Strompreis ist. Jeder Sensor, der den aktuellen Periodenpreis als Zustand anzeigt, funktioniert.",
+          "max_price_threshold": "Laden wird aktiviert, wenn der aktuelle Preis diesen Wert nicht übersteigt. Gleiche Einheit wie der Sensor verwenden. Leer lassen, wenn der Tagesdurchschnittssensor verwendet wird.",
+          "average_price_sensor": "Wenn angegeben, wird dieser Wert als Schwellenwert anstelle des fixen Wertes verwendet. Leer lassen für den fixen Schwellenwert.",
+          "solar_forecast_sensor": "Sensor, der die Solarproduktionsprognose in kWh liefert. Nicht erforderlich, wenn dieser Sensor bereits im ersten Schritt konfiguriert wurde — er wird automatisch verwendet.",
           "max_contracted_power": "Gesamt-Vertragsleistung (ICP) in Watt. Das System überschreitet dieses Limit beim Laden nicht, um ein Auslösen der Sicherung zu vermeiden"
         }
       },
@@ -516,7 +552,8 @@
     "predictive_charging_mode": {
       "options": {
         "time_slot": "Zeitfenster",
-        "dynamic_pricing": "Dynamischer Preis"
+        "dynamic_pricing": "Dynamischer Preis",
+        "realtime_price": "Echtzeit-Preis (sofortiger Schwellenwert)"
       }
     },
     "price_integration_type": {
@@ -534,7 +571,11 @@
       "charge_delay": { "name": "Ladeverzögerung" },
       "capacity_protection": { "name": "Kapazitätsschutz" },
       "backup_function": { "name": "Backup-Funktion" },
-      "rs485_control_mode": { "name": "RS485-Steuermodus" }
+      "rs485_control_mode": { "name": "RS485-Steuermodus" },
+      "automation_charging_active": { "name": "Laden nach externem Preis" }
+    },
+    "time": {
+      "automation_charging_end_time": { "name": "Ende Externes Laden" }
     },
     "sensor": {
       "excluded_devices": { "name": "Ausgeschlossene Geräte" },

@@ -130,7 +130,7 @@
           "predictive_charging_mode": "Charging mode"
         },
         "data_description": {
-          "predictive_charging_mode": "Time Slot: charge during a fixed nightly window. Dynamic Pricing: automatically select the cheapest hours from a price sensor."
+          "predictive_charging_mode": "Time Slot: charge during a fixed nightly window. Dynamic Pricing: automatically select the cheapest hours from a price sensor. Real-Time Price: activate charging instantly whenever the current price is below a threshold — no scheduling needed."
         }
       },
       "predictive_charging_config": {
@@ -166,6 +166,24 @@
           "price_sensor": "Sensor providing electricity prices (e.g., sensor.nordpool_kwh_es_eur_3_10_0 for Nordpool, sensor.esios_pvpc for PVPC, or your CKW sensor for Switzerland)",
           "max_price_threshold": "Slots above this price will not be selected. Use the same unit as the sensor: ct/kWh for Nordpool, €/kWh for PVPC, Rp/kWh for CKW. Leave empty to use all slots.",
           "solar_forecast_sensor": "Sensor providing the solar production forecast in kWh (e.g., Solcast). If you have solar panels, configure this sensor — the system will only charge from the grid when solar forecast is insufficient. If you have no solar panels, leave this empty — the system will charge whenever battery energy is not enough for the day. Not required if you already configured this sensor in the initial setup step — it will be used automatically.",
+          "max_contracted_power": "Total contracted power (ICP) in watts. System won't exceed this limit when charging to avoid tripping the breaker"
+        }
+      },
+      "realtime_price_config": {
+        "title": "Predictive Charging — Real-Time Price",
+        "description": "Configure the price sensor and threshold. The system reads the current price every few seconds and starts or stops grid charging immediately — no daily schedule needed.",
+        "data": {
+          "price_sensor": "Electricity price sensor",
+          "max_price_threshold": "Maximum price threshold (optional)",
+          "average_price_sensor": "Daily average price sensor (optional)",
+          "solar_forecast_sensor": "Solar forecast sensor (kWh)",
+          "max_contracted_power": "Maximum contracted power ICP (W)"
+        },
+        "data_description": {
+          "price_sensor": "Sensor whose state is the current electricity price (e.g. sensor.esios_pvpc, sensor.nordpool_kwh_es_eur_3_10_0). Any sensor that exposes the current period price as its state works.",
+          "max_price_threshold": "Charging activates when the current price is at or below this value. Use the same unit as your price sensor (e.g. €/kWh for PVPC, ct/kWh for Nordpool). Leave empty if using the daily average sensor below.",
+          "average_price_sensor": "If provided, this sensor's state is used as the threshold instead of the fixed value above — useful when your price integration already exposes a daily average. Leave empty to use the fixed threshold.",
+          "solar_forecast_sensor": "Sensor providing the solar production forecast in kWh (e.g., Solcast). If you have solar panels, configure this sensor — the system will only charge from the grid when solar forecast is insufficient. Not required if you already configured this sensor in the initial setup step — it will be used automatically.",
           "max_contracted_power": "Total contracted power (ICP) in watts. System won't exceed this limit when charging to avoid tripping the breaker"
         }
       },
@@ -368,7 +386,7 @@
           "predictive_charging_mode": "Charging mode"
         },
         "data_description": {
-          "predictive_charging_mode": "Time Slot: charge during a fixed nightly window. Dynamic Pricing: automatically select the cheapest hours from a price sensor."
+          "predictive_charging_mode": "Time Slot: charge during a fixed nightly window. Dynamic Pricing: automatically select the cheapest hours from a price sensor. Real-Time Price: activate charging instantly whenever the current price is below a threshold — no scheduling needed."
         }
       },
       "predictive_charging_config": {
@@ -404,6 +422,24 @@
           "price_sensor": "Sensor providing electricity prices (e.g., sensor.nordpool_kwh_es_eur_3_10_0 for Nordpool, sensor.esios_pvpc for PVPC, or your CKW sensor for Switzerland)",
           "max_price_threshold": "Slots above this price will not be selected. Use the same unit as the sensor: ct/kWh for Nordpool, €/kWh for PVPC, Rp/kWh for CKW. Leave empty to use all slots.",
           "solar_forecast_sensor": "Sensor providing the solar production forecast in kWh (e.g., Solcast). If you have solar panels, configure this sensor — the system will only charge from the grid when solar forecast is insufficient. If you have no solar panels, leave this empty — the system will charge whenever battery energy is not enough for the day. Not required if you already configured this sensor in the initial setup step — it will be used automatically.",
+          "max_contracted_power": "Total contracted power (ICP) in watts. System won't exceed this limit when charging to avoid tripping the breaker"
+        }
+      },
+      "realtime_price_config": {
+        "title": "Predictive Charging — Real-Time Price",
+        "description": "Configure the price sensor and threshold. The system reads the current price every few seconds and starts or stops grid charging immediately — no daily schedule needed.",
+        "data": {
+          "price_sensor": "Electricity price sensor",
+          "max_price_threshold": "Maximum price threshold (optional)",
+          "average_price_sensor": "Daily average price sensor (optional)",
+          "solar_forecast_sensor": "Solar forecast sensor (kWh)",
+          "max_contracted_power": "Maximum contracted power ICP (W)"
+        },
+        "data_description": {
+          "price_sensor": "Sensor whose state is the current electricity price (e.g. sensor.esios_pvpc, sensor.nordpool_kwh_es_eur_3_10_0). Any sensor that exposes the current period price as its state works.",
+          "max_price_threshold": "Charging activates when the current price is at or below this value. Use the same unit as your price sensor (e.g. €/kWh for PVPC, ct/kWh for Nordpool). Leave empty if using the daily average sensor below.",
+          "average_price_sensor": "If provided, this sensor's state is used as the threshold instead of the fixed value above — useful when your price integration already exposes a daily average. Leave empty to use the fixed threshold.",
+          "solar_forecast_sensor": "Sensor providing the solar production forecast in kWh (e.g., Solcast). If you have solar panels, configure this sensor — the system will only charge from the grid when solar forecast is insufficient. Not required if you already configured this sensor in the initial setup step — it will be used automatically.",
           "max_contracted_power": "Total contracted power (ICP) in watts. System won't exceed this limit when charging to avoid tripping the breaker"
         }
       },
@@ -515,7 +551,8 @@
     "predictive_charging_mode": {
       "options": {
         "time_slot": "Time Slot (fixed nightly window)",
-        "dynamic_pricing": "Dynamic Pricing (cheapest hours)"
+        "dynamic_pricing": "Dynamic Pricing (cheapest hours)",
+        "realtime_price": "Real-Time Price (instant threshold)"
       }
     },
     "price_integration_type": {
@@ -533,7 +570,11 @@
       "charge_delay": { "name": "Charge Delay" },
       "capacity_protection": { "name": "Capacity Protection" },
       "backup_function": { "name": "Backup Function" },
-      "rs485_control_mode": { "name": "RS485 Control Mode" }
+      "rs485_control_mode": { "name": "RS485 Control Mode" },
+      "automation_charging_active": { "name": "External Price Charging" }
+    },
+    "time": {
+      "automation_charging_end_time": { "name": "External Charging End Time" }
     },
     "sensor": {
       "excluded_devices": { "name": "Excluded Devices" },

@@ -7,6 +7,7 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, CONF_CAPACITY_PROTECTION_ENABLED, CONF_ENABLE_CHARGE_DELAY, CONF_ENABLE_WEEKLY_FULL_CHARGE_DELAY, CONF_MANUAL_MODE_ENABLED, CONF_PREDICTIVE_CHARGING_OVERRIDDEN
@@ -450,3 +451,5 @@ class ManualModeSwitch(SwitchEntity):
             "manufacturer": "Marstek",
             "model": "Venus Multi-Battery System",
         }
+
+

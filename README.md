@@ -127,7 +127,7 @@ This feature allows you to "mask" high-power devices so the battery doesn't try 
     *   **Allow Solar Surplus**: If checked, the battery will not charge to compensate for this device's consumption when the system is running on solar surplus.
 
 ### 6. Predictive Charging (Optional)
-Automatically charge the battery from the grid when tomorrow's solar forecast is insufficient to cover expected consumption. Two modes are available:
+Automatically charge the battery from the grid when tomorrow's solar forecast is insufficient to cover expected consumption. Three modes are available:
 
 #### Mode A — Time Slot
 Charges during a fixed time window (e.g. overnight off-peak hours).
@@ -163,6 +163,26 @@ Instead of a fixed window, the system evaluates electricity prices for the day a
 
 > [!NOTE]
 > **Notification**: Sent at **00:05** (or on startup) with the full energy balance, selected hours, average price, and estimated cost. When no charging is needed, the notification is clearly labelled as informational. Use the **Override Predictive Charging** switch to cancel an active charge session.
+
+#### Mode C — Real-Time Price
+Instead of pre-selecting hours the night before, the integration reads the current electricity price **every few seconds** and activates or deactivates grid charging instantly when the price crosses a configured threshold.
+
+*   **Enable**: Check "Configure predictive charging" and select **Real-Time Price**.
+*   **Settings**:
+    *   **Price sensor**: Any HA sensor whose state is the current electricity price (PVPC, Nordpool, CKW, or any other integration).
+    *   **Maximum price threshold** *(Optional)*: Charging activates when the current price is at or below this value. Use the same unit as your sensor.
+    *   **Daily average price sensor** *(Optional)*: If provided, the sensor's value is used as the threshold instead of the fixed value above — useful when your price integration already exposes a daily average, so charging happens whenever the current price is cheaper than today's average.
+    *   **Solar Forecast Sensor** *(Optional)*: Same as other modes — leave empty if no solar panels.
+    *   **Max Contracted Power**: Same as other modes.
+
+*   **How it works**:
+    1.  Every controller cycle (~2.5 s) the integration reads the current price from the configured sensor.
+    2.  If the price is at or below the threshold **and** the energy balance check confirms charging is needed, grid charging activates immediately.
+    3.  As soon as the price rises above the threshold, charging stops and the system returns to normal PD control.
+    4.  If a new cheap period starts later, the cycle repeats automatically.
+
+> [!NOTE]
+> Unlike Dynamic Pricing (Mode B), this mode requires no overnight evaluation and no price forecast — it reacts purely to the live price. The trade-off is that it cannot optimise across the whole day: it charges whenever the price is cheap regardless of whether enough cheap hours remain to cover the deficit.
 
 ### 7. Weekly Full Charge (Optional)
 LFP batteries need to hit 100% periodically to balance individual cells.

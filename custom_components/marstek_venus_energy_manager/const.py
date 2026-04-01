@@ -645,7 +645,6 @@ EFFICIENCY_SENSOR_DEFINITIONS = [
         "key": "round_trip_efficiency_total",
         "name": "Round-Trip Efficiency Total",
         "unit": "%",
-        "device_class": "battery",
         "state_class": "measurement",
         "dependency_keys": {
             "charge": "total_charging_energy",            
@@ -1618,7 +1617,6 @@ EFFICIENCY_SENSOR_DEFINITIONS_V3 = [
         "key": "round_trip_efficiency_total",
         "name": "Round-Trip Efficiency Total",
         "unit": "%",
-        "device_class": "battery",
         "state_class": "measurement",
         "dependency_keys": {
             "charge": "total_charging_energy",
@@ -1729,6 +1727,9 @@ CONF_MAX_PRICE_THRESHOLD = "max_price_threshold"
 
 PREDICTIVE_MODE_TIME_SLOT = "time_slot"
 PREDICTIVE_MODE_DYNAMIC_PRICING = "dynamic_pricing"
+PREDICTIVE_MODE_REALTIME_PRICE = "realtime_price"
+
+CONF_AVERAGE_PRICE_SENSOR = "average_price_sensor"
 
 PRICE_INTEGRATION_NORDPOOL = "nordpool"
 PRICE_INTEGRATION_PVPC = "pvpc"

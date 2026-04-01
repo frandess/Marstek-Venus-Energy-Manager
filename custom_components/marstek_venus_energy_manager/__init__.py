@@ -65,8 +65,10 @@ from .const import (
     CONF_PRICE_SENSOR,
     CONF_PRICE_INTEGRATION_TYPE,
     CONF_MAX_PRICE_THRESHOLD,
+    CONF_AVERAGE_PRICE_SENSOR,
     PREDICTIVE_MODE_TIME_SLOT,
     PREDICTIVE_MODE_DYNAMIC_PRICING,
+    PREDICTIVE_MODE_REALTIME_PRICE,
     PRICE_INTEGRATION_NORDPOOL,
     PRICE_INTEGRATION_PVPC,
     PRICE_INTEGRATION_CKW,
@@ -174,6 +176,10 @@ class ChargeDischargeController:
         self.predictive_charging_overridden = config_entry.data.get(CONF_PREDICTIVE_CHARGING_OVERRIDDEN, False)
         self._grid_charging_initialized = False  # Flag for initialization
         self._last_decision_data = None  # Store last decision for diagnostics
+
+        # Real-time Price Mode state
+        self.average_price_sensor = config_entry.data.get(CONF_AVERAGE_PRICE_SENSOR, None)
+        self._realtime_price_charging: bool = False  # True while actively charging in this mode
 
         # Dynamic Pricing Mode state
         self.predictive_charging_mode = config_entry.data.get(CONF_PREDICTIVE_CHARGING_MODE, PREDICTIVE_MODE_TIME_SLOT)
@@ -2926,7 +2932,8 @@ class ChargeDischargeController:
     def _format_predictive_notification_message(
         self,
         decision_data: dict,
-        is_pre_evaluation: bool
+        is_pre_evaluation: bool,
+        is_daily_evaluation: bool = False,
     ) -> tuple[str, str]:
         """Format notification title and message from decision data.
 
@@ -2991,14 +2998,18 @@ class ChargeDischargeController:
             slot_str = None
 
         if is_pre_evaluation:
-            title = (
-                f"Predictive Charging: Activates at {start_time.strftime('%H:%M')}"
-                if slot_str else "Predictive Charging: Will activate"
-            )
-            timing_line = (
-                f"⏰ Charging window: {slot_str} (starts in ~1 hour)\n"
-                if slot_str else "⏰ Charging will start in ~1 hour\n"
-            )
+            if is_daily_evaluation:
+                title = "Predictive Charging: Expected tomorrow"
+                timing_line = "⏰ Charging will activate when prices are low\n"
+            else:
+                title = (
+                    f"Predictive Charging: Activates at {start_time.strftime('%H:%M')}"
+                    if slot_str else "Predictive Charging: Will activate"
+                )
+                timing_line = (
+                    f"⏰ Charging window: {slot_str} (starts in ~1 hour)\n"
+                    if slot_str else "⏰ Charging will start in ~1 hour\n"
+                )
         else:
             title = "Predictive Charging: STARTED"
             timing_line = (
@@ -3434,6 +3445,88 @@ class ChargeDischargeController:
         # Not in a cheap slot — fall through to normal PD control (no return here)
 
     # =========================================================================
+    # REAL-TIME PRICE: reactive charging based on current price every cycle
+    # =========================================================================
+
+    async def _handle_realtime_price_predictive_charging(self) -> None:
+        """Handle predictive charging in real-time price mode (called every 2.5s).
+
+        Reads the current price every cycle and activates/deactivates grid charging
+        immediately when the price crosses the threshold, with no pre-scheduling.
+        If an average_price_sensor is configured its value is used as the threshold
+        instead of the fixed max_price_threshold.
+        """
+        price_state = self.hass.states.get(self.price_sensor)
+        if price_state is None:
+            _LOGGER.debug("Real-time price: price sensor %s unavailable", self.price_sensor)
+            if self._realtime_price_charging:
+                self._realtime_price_charging = False
+                self.grid_charging_active = False
+                self._grid_charging_initialized = False
+                self.previous_power = 0
+                self.previous_error = 0
+            return
+
+        try:
+            current_price = float(price_state.state)
+        except (ValueError, TypeError):
+            _LOGGER.debug("Real-time price: cannot parse price state '%s'", price_state.state)
+            return
+
+        # Determine threshold: average sensor if configured, else fixed threshold
+        threshold = None
+        if self.average_price_sensor:
+            avg_state = self.hass.states.get(self.average_price_sensor)
+            if avg_state is not None:
+                try:
+                    threshold = float(avg_state.state)
+                except (ValueError, TypeError):
+                    pass
+        if threshold is None:
+            threshold = self.max_price_threshold
+
+        if threshold is None:
+            _LOGGER.debug("Real-time price: no threshold configured, skipping")
+            return
+
+        price_is_cheap = current_price <= threshold
+        _LOGGER.debug(
+            "Real-time price: current=%.4f threshold=%.4f cheap=%s charging=%s",
+            current_price, threshold, price_is_cheap, self._realtime_price_charging,
+        )
+
+        if price_is_cheap and not self._realtime_price_charging:
+            # Evaluate whether charging is actually needed before starting
+            decision_data = await self._should_activate_grid_charging()
+            self._last_decision_data = decision_data
+            if decision_data["should_charge"]:
+                self._realtime_price_charging = True
+                self._grid_charging_initialized = False
+                self.grid_charging_active = True
+                _LOGGER.info(
+                    "Real-time price: charging STARTED (price=%.4f <= threshold=%.4f)",
+                    current_price, threshold,
+                )
+            else:
+                _LOGGER.info(
+                    "Real-time price: cheap price but charging NOT needed (sufficient energy)",
+                )
+
+        elif not price_is_cheap and self._realtime_price_charging:
+            self._realtime_price_charging = False
+            self.grid_charging_active = False
+            self._grid_charging_initialized = False
+            self.previous_power = 0
+            self.previous_error = 0
+            _LOGGER.info(
+                "Real-time price: charging STOPPED (price=%.4f > threshold=%.4f)",
+                current_price, threshold,
+            )
+
+        if self.grid_charging_active:
+            await self._handle_predictive_grid_charging()
+
+    # =========================================================================
     # TIME SLOT: extracted handler
     # =========================================================================
 
@@ -3556,16 +3649,20 @@ class ChargeDischargeController:
     async def _send_predictive_charging_notification(
         self,
         is_pre_evaluation: bool,
-        decision_data: dict
+        decision_data: dict,
+        is_daily_evaluation: bool = False,
     ):
         """Send notification about predictive charging evaluation result.
 
         Args:
             is_pre_evaluation: True if pre-evaluation (1 hour before), False if initial
             decision_data: Dict from _should_activate_grid_charging() with decision factors
+            is_daily_evaluation: True when called from the daily 23:00 assessment in automation_slots mode (unused, kept for signature compatibility)
         """
         # Format the notification using the helper method
-        title, message = self._format_predictive_notification_message(decision_data, is_pre_evaluation)
+        title, message = self._format_predictive_notification_message(
+            decision_data, is_pre_evaluation, is_daily_evaluation
+        )
 
         # Send the notification
         await self.hass.services.async_call(
@@ -3634,6 +3731,10 @@ class ChargeDischargeController:
                 # Dynamic pricing falls through to normal PD control when not in a slot;
                 # it only returns early when actively charging or overridden.
                 if self.grid_charging_active or self.predictive_charging_overridden:
+                    return
+            elif self.predictive_charging_mode == PREDICTIVE_MODE_REALTIME_PRICE:
+                await self._handle_realtime_price_predictive_charging()
+                if self.grid_charging_active:
                     return
             else:
                 # Default: time slot mode
