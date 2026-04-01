@@ -130,7 +130,7 @@
           "predictive_charging_mode": "Modo de carga"
         },
         "data_description": {
-          "predictive_charging_mode": "Franja horaria: carga en una ventana nocturna fija. Precio dinámico: selecciona automáticamente las horas más baratas del sensor de precios. Slot automático: activa la carga desde tus propias automatizaciones con cualquier sensor de precio."
+          "predictive_charging_mode": "Franja horaria: carga en una ventana nocturna fija. Precio dinámico: selecciona automáticamente las horas más baratas del sensor de precios. Precio en tiempo real: activa la carga al instante cuando el precio cae por debajo del umbral — sin planificación previa."
         }
       },
       "predictive_charging_config": {
@@ -169,14 +169,20 @@
           "max_contracted_power": "Potencia total contratada (ICP) en vatios. El sistema no superará este límite al cargar para evitar que salte el diferencial"
         }
       },
-      "automation_slots_config": {
-        "title": "Carga predictiva — Slot automático",
-        "description": "Configura los parámetros del modo de carga con slot controlado por automatizaciones externas. Usa el blueprint incluido con cualquier sensor de precio — el blueprint activa la carga automáticamente cuando los precios están por debajo de tu umbral.",
+      "realtime_price_config": {
+        "title": "Carga predictiva — Precio en tiempo real",
+        "description": "Configura el sensor de precio y el umbral. El sistema lee el precio actual cada pocos segundos e inicia o detiene la carga desde la red de forma inmediata — sin necesidad de planificación diaria.",
         "data": {
+          "price_sensor": "Sensor de precio eléctrico",
+          "max_price_threshold": "Precio máximo (opcional)",
+          "average_price_sensor": "Sensor de precio medio diario (opcional)",
           "solar_forecast_sensor": "Sensor de predicción solar (kWh)",
           "max_contracted_power": "Potencia máxima contratada ICP (W)"
         },
         "data_description": {
+          "price_sensor": "Sensor cuyo estado es el precio eléctrico actual (ej: sensor.esios_pvpc, sensor.nordpool_kwh_es_eur_3_10_0). Funciona con cualquier sensor que exponga el precio del periodo actual como su estado.",
+          "max_price_threshold": "La carga se activa cuando el precio actual es igual o inferior a este valor. Usa la misma unidad que tu sensor (ej: €/kWh para PVPC, ct/kWh para Nordpool). Déjalo vacío si usas el sensor de precio medio diario.",
+          "average_price_sensor": "Si se configura, su valor se usa como umbral en lugar del valor fijo anterior — útil cuando tu integración de precios ya expone un precio medio diario. Déjalo vacío para usar el umbral fijo.",
           "solar_forecast_sensor": "Sensor que proporciona la predicción de producción solar en kWh (ej: Solcast). Si tienes paneles solares, configúralo — el sistema solo cargará desde la red cuando la previsión solar sea insuficiente. No es necesario si ya configuraste este sensor en el paso inicial: se usará automáticamente.",
           "max_contracted_power": "Potencia total contratada (ICP) en vatios. El sistema no superará este límite al cargar para evitar que salte el diferencial"
         }
@@ -380,7 +386,7 @@
           "predictive_charging_mode": "Modo de carga"
         },
         "data_description": {
-          "predictive_charging_mode": "Franja horaria: carga en una ventana nocturna fija. Precio dinámico: selecciona automáticamente las horas más baratas del sensor de precios. Slot automático: activa la carga desde tus propias automatizaciones con cualquier sensor de precio."
+          "predictive_charging_mode": "Franja horaria: carga en una ventana nocturna fija. Precio dinámico: selecciona automáticamente las horas más baratas del sensor de precios. Precio en tiempo real: activa la carga al instante cuando el precio cae por debajo del umbral — sin planificación previa."
         }
       },
       "predictive_charging_config": {
@@ -419,14 +425,20 @@
           "max_contracted_power": "Potencia total contratada (ICP) en vatios. El sistema no superará este límite al cargar para evitar que salte el diferencial"
         }
       },
-      "automation_slots_config": {
-        "title": "Carga predictiva — Slot automático",
-        "description": "Configura los parámetros del modo de carga con slot controlado por automatizaciones externas. Usa el blueprint incluido con cualquier sensor de precio — el blueprint activa la carga automáticamente cuando los precios están por debajo de tu umbral.",
+      "realtime_price_config": {
+        "title": "Carga predictiva — Precio en tiempo real",
+        "description": "Configura el sensor de precio y el umbral. El sistema lee el precio actual cada pocos segundos e inicia o detiene la carga desde la red de forma inmediata — sin necesidad de planificación diaria.",
         "data": {
+          "price_sensor": "Sensor de precio eléctrico",
+          "max_price_threshold": "Precio máximo (opcional)",
+          "average_price_sensor": "Sensor de precio medio diario (opcional)",
           "solar_forecast_sensor": "Sensor de predicción solar (kWh)",
           "max_contracted_power": "Potencia máxima contratada ICP (W)"
         },
         "data_description": {
+          "price_sensor": "Sensor cuyo estado es el precio eléctrico actual (ej: sensor.esios_pvpc, sensor.nordpool_kwh_es_eur_3_10_0). Funciona con cualquier sensor que exponga el precio del periodo actual como su estado.",
+          "max_price_threshold": "La carga se activa cuando el precio actual es igual o inferior a este valor. Usa la misma unidad que tu sensor (ej: €/kWh para PVPC, ct/kWh para Nordpool). Déjalo vacío si usas el sensor de precio medio diario.",
+          "average_price_sensor": "Si se configura, su valor se usa como umbral en lugar del valor fijo anterior — útil cuando tu integración de precios ya expone un precio medio diario. Déjalo vacío para usar el umbral fijo.",
           "solar_forecast_sensor": "Sensor que proporciona la predicción de producción solar en kWh (ej: Solcast). Si tienes paneles solares, configúralo — el sistema solo cargará desde la red cuando la previsión solar sea insuficiente. No es necesario si ya configuraste este sensor en el paso inicial: se usará automáticamente.",
           "max_contracted_power": "Potencia total contratada (ICP) en vatios. El sistema no superará este límite al cargar para evitar que salte el diferencial"
         }
@@ -541,7 +553,7 @@
       "options": {
         "time_slot": "Franja horaria (ventana nocturna fija)",
         "dynamic_pricing": "Precio dinámico (horas más baratas)",
-        "automation_slots": "Slot automático (sensor de precio externo)"
+        "realtime_price": "Precio en tiempo real (umbral instantáneo)"
       }
     },
     "price_integration_type": {

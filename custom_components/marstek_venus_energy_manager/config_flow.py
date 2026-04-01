@@ -62,9 +62,10 @@ from .const import (
     CONF_PRICE_SENSOR,
     CONF_PRICE_INTEGRATION_TYPE,
     CONF_MAX_PRICE_THRESHOLD,
+    CONF_AVERAGE_PRICE_SENSOR,
     PREDICTIVE_MODE_TIME_SLOT,
     PREDICTIVE_MODE_DYNAMIC_PRICING,
-    PREDICTIVE_MODE_AUTOMATION_SLOTS,
+    PREDICTIVE_MODE_REALTIME_PRICE,
     PRICE_INTEGRATION_NORDPOOL,
     PRICE_INTEGRATION_PVPC,
     PRICE_INTEGRATION_CKW,
@@ -545,8 +546,8 @@ class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
             self.config_data[CONF_PREDICTIVE_CHARGING_MODE] = mode
             if mode == PREDICTIVE_MODE_DYNAMIC_PRICING:
                 return await self.async_step_dynamic_pricing_config()
-            elif mode == PREDICTIVE_MODE_AUTOMATION_SLOTS:
-                return await self.async_step_automation_slots_config()
+            elif mode == PREDICTIVE_MODE_REALTIME_PRICE:
+                return await self.async_step_realtime_price_config()
             else:
                 return await self.async_step_predictive_charging_config()
 
@@ -560,7 +561,7 @@ class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
                                 options=[
                                     PREDICTIVE_MODE_TIME_SLOT,
                                     PREDICTIVE_MODE_DYNAMIC_PRICING,
-                                    PREDICTIVE_MODE_AUTOMATION_SLOTS,
+                                    PREDICTIVE_MODE_REALTIME_PRICE,
                                 ],
                                 translation_key="predictive_charging_mode",
                                 mode=SelectSelectorMode.LIST,
@@ -733,15 +734,20 @@ class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_automation_slots_config(
+    async def async_step_realtime_price_config(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Step 11c: Configure automation-driven rolling slot predictive grid charging."""
+        """Step 11d: Configure real-time price charging mode."""
         errors = {}
         has_global_sensor = bool(self.config_data.get(CONF_SOLAR_FORECAST_SENSOR))
 
         if user_input is not None:
             try:
+                price_sensor = user_input[CONF_PRICE_SENSOR]
+                price_state = self.hass.states.get(price_sensor)
+                if price_state is None:
+                    errors[CONF_PRICE_SENSOR] = "sensor_not_found"
+
                 if has_global_sensor:
                     forecast_sensor = self.config_data[CONF_SOLAR_FORECAST_SENSOR]
                 else:
@@ -756,18 +762,34 @@ class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
                                 errors["solar_forecast_sensor"] = "invalid_unit"
 
                 if not errors:
+                    max_price_raw = user_input.get(CONF_MAX_PRICE_THRESHOLD)
+                    max_price = float(max_price_raw) if max_price_raw else None
+                    avg_sensor = user_input.get(CONF_AVERAGE_PRICE_SENSOR) or None
+
                     self.config_data["enable_predictive_charging"] = True
-                    self.config_data[CONF_PREDICTIVE_CHARGING_MODE] = PREDICTIVE_MODE_AUTOMATION_SLOTS
+                    self.config_data[CONF_PREDICTIVE_CHARGING_MODE] = PREDICTIVE_MODE_REALTIME_PRICE
+                    self.config_data[CONF_PRICE_SENSOR] = price_sensor
+                    self.config_data[CONF_MAX_PRICE_THRESHOLD] = max_price
+                    self.config_data[CONF_AVERAGE_PRICE_SENSOR] = avg_sensor
                     self.config_data["max_contracted_power"] = user_input["max_contracted_power"]
                     self.config_data[CONF_SOLAR_FORECAST_SENSOR] = forecast_sensor
                     self.config_data["charging_time_slot"] = None
 
                     return await self.async_step_weekly_full_charge()
             except Exception as e:
-                _LOGGER.error("Error validating automation slots config: %s", e)
+                _LOGGER.error("Error validating real-time price config: %s", e)
                 errors["base"] = "unknown"
 
-        schema_dict: dict = {}
+        schema_dict: dict = {
+            vol.Required(CONF_PRICE_SENSOR):
+                EntitySelector(EntitySelectorConfig(domain="sensor")),
+            vol.Optional(CONF_MAX_PRICE_THRESHOLD):
+                NumberSelector(
+                    NumberSelectorConfig(min=0, max=5.0, step=0.001, mode=NumberSelectorMode.BOX)
+                ),
+            vol.Optional(CONF_AVERAGE_PRICE_SENSOR):
+                EntitySelector(EntitySelectorConfig(domain="sensor")),
+        }
         if not has_global_sensor:
             schema_dict[vol.Optional("solar_forecast_sensor")] = EntitySelector(
                 EntitySelectorConfig(domain="sensor")
@@ -777,7 +799,7 @@ class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
         return self.async_show_form(
-            step_id="automation_slots_config",
+            step_id="realtime_price_config",
             data_schema=vol.Schema(schema_dict),
             errors=errors,
         )
@@ -1552,8 +1574,8 @@ class OptionsFlowHandler(OptionsFlow):
             self.config_data[CONF_PREDICTIVE_CHARGING_MODE] = mode
             if mode == PREDICTIVE_MODE_DYNAMIC_PRICING:
                 return await self.async_step_dynamic_pricing_config()
-            elif mode == PREDICTIVE_MODE_AUTOMATION_SLOTS:
-                return await self.async_step_automation_slots_config()
+            elif mode == PREDICTIVE_MODE_REALTIME_PRICE:
+                return await self.async_step_realtime_price_config()
             else:
                 return await self.async_step_predictive_charging_config()
 
@@ -1567,7 +1589,7 @@ class OptionsFlowHandler(OptionsFlow):
                                 options=[
                                     PREDICTIVE_MODE_TIME_SLOT,
                                     PREDICTIVE_MODE_DYNAMIC_PRICING,
-                                    PREDICTIVE_MODE_AUTOMATION_SLOTS,
+                                    PREDICTIVE_MODE_REALTIME_PRICE,
                                 ],
                                 translation_key="predictive_charging_mode",
                                 mode=SelectSelectorMode.LIST,
@@ -1767,18 +1789,21 @@ class OptionsFlowHandler(OptionsFlow):
             errors=errors,
         )
 
-    async def async_step_automation_slots_config(
+    async def async_step_realtime_price_config(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Configure automation-driven rolling slot predictive grid charging in options flow."""
+        """Configure real-time price charging mode in options flow."""
         errors = {}
-        has_global_sensor = bool(self.config_data.get(CONF_SOLAR_FORECAST_SENSOR))
         existing_config = self.config_entry.data
-        default_forecast = existing_config.get(CONF_SOLAR_FORECAST_SENSOR, "")
-        default_power = existing_config.get("max_contracted_power", 7000)
+        has_global_sensor = bool(self.config_data.get(CONF_SOLAR_FORECAST_SENSOR))
 
         if user_input is not None:
             try:
+                price_sensor = user_input[CONF_PRICE_SENSOR]
+                price_state = self.hass.states.get(price_sensor)
+                if price_state is None:
+                    errors[CONF_PRICE_SENSOR] = "sensor_not_found"
+
                 if has_global_sensor:
                     forecast_sensor = self.config_data[CONF_SOLAR_FORECAST_SENSOR]
                 else:
@@ -1793,18 +1818,45 @@ class OptionsFlowHandler(OptionsFlow):
                                 errors["solar_forecast_sensor"] = "invalid_unit"
 
                 if not errors:
+                    max_price_raw = user_input.get(CONF_MAX_PRICE_THRESHOLD)
+                    max_price = float(max_price_raw) if max_price_raw else None
+                    avg_sensor = user_input.get(CONF_AVERAGE_PRICE_SENSOR) or None
+
                     self.config_data["enable_predictive_charging"] = True
-                    self.config_data[CONF_PREDICTIVE_CHARGING_MODE] = PREDICTIVE_MODE_AUTOMATION_SLOTS
+                    self.config_data[CONF_PREDICTIVE_CHARGING_MODE] = PREDICTIVE_MODE_REALTIME_PRICE
+                    self.config_data[CONF_PRICE_SENSOR] = price_sensor
+                    self.config_data[CONF_MAX_PRICE_THRESHOLD] = max_price
+                    self.config_data[CONF_AVERAGE_PRICE_SENSOR] = avg_sensor
                     self.config_data["max_contracted_power"] = user_input["max_contracted_power"]
                     self.config_data[CONF_SOLAR_FORECAST_SENSOR] = forecast_sensor
                     self.config_data["charging_time_slot"] = None
-
                     return await self.async_step_weekly_full_charge()
             except Exception as e:
-                _LOGGER.error("Error validating automation slots config: %s", e)
+                _LOGGER.error("Error validating real-time price config: %s", e)
                 errors["base"] = "unknown"
 
-        schema_dict: dict = {}
+        default_sensor = existing_config.get(CONF_PRICE_SENSOR, "")
+        default_max_price = existing_config.get(CONF_MAX_PRICE_THRESHOLD)
+        default_avg_sensor = existing_config.get(CONF_AVERAGE_PRICE_SENSOR, "")
+        default_power = existing_config.get("max_contracted_power", 7000)
+        default_forecast = existing_config.get("solar_forecast_sensor", "")
+
+        schema_dict: dict = {
+            vol.Required(CONF_PRICE_SENSOR, default=default_sensor if default_sensor else vol.UNDEFINED):
+                EntitySelector(EntitySelectorConfig(domain="sensor")),
+            vol.Optional(
+                CONF_MAX_PRICE_THRESHOLD,
+                default=default_max_price if default_max_price is not None else vol.UNDEFINED
+            ):
+                NumberSelector(
+                    NumberSelectorConfig(min=0, max=5.0, step=0.001, mode=NumberSelectorMode.BOX)
+                ),
+            vol.Optional(
+                CONF_AVERAGE_PRICE_SENSOR,
+                default=default_avg_sensor if default_avg_sensor else vol.UNDEFINED
+            ):
+                EntitySelector(EntitySelectorConfig(domain="sensor")),
+        }
         if not has_global_sensor:
             schema_dict[vol.Optional(
                 "solar_forecast_sensor",
@@ -1815,7 +1867,7 @@ class OptionsFlowHandler(OptionsFlow):
         )
 
         return self.async_show_form(
-            step_id="automation_slots_config",
+            step_id="realtime_price_config",
             data_schema=vol.Schema(schema_dict),
             errors=errors,
         )

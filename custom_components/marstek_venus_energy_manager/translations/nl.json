@@ -148,7 +148,7 @@
           "predictive_charging_mode": "Laadmodus"
         },
         "data_description": {
-          "predictive_charging_mode": "Tijdslot: Laden tijdens een vast daltariefvenster. Dynamische prijs: Dagelijkse selectie van de goedkoopste uren op basis van Nordpool/ENTSO-e prijzen. Automatiseringsslot: Laadactivering vanuit eigen automatiseringen met elke prijssensor."
+          "predictive_charging_mode": "Tijdslot: Laden tijdens een vast daltariefvenster. Dynamische prijs: Dagelijkse selectie van de goedkoopste uren op basis van Nordpool/ENTSO-e prijzen. Realtimeprijs: Onmiddellijke activering van het laden wanneer de prijs onder de drempel daalt."
         }
       },
       "dynamic_pricing_config": {
@@ -169,14 +169,20 @@
           "max_contracted_power": "Totaal gecontracteerd vermogen (ICP) in watt. Het systeem overschrijdt deze limiet niet bij het laden om het uitvallen van de zekering te voorkomen"
         }
       },
-      "automation_slots_config": {
-        "title": "Voorspellend laden — Automatiseringsslot",
-        "description": "Parameters configureren voor automatiseringsgestuurd laden. Gebruik de meegeleverde blueprint met elke prijssensor — de blueprint activeert het laden automatisch wanneer de prijzen onder uw drempelwaarde liggen.",
+      "realtime_price_config": {
+        "title": "Voorspellend laden — Realtimeprijs",
+        "description": "Configureer de prijssensor en drempelwaarde. Het systeem leest de huidige prijs elke paar seconden en start of stopt het netwerkladen onmiddellijk — geen dagelijkse planning nodig.",
         "data": {
+          "price_sensor": "Elektriciteitsprijssensor",
+          "max_price_threshold": "Maximale prijsdrempel (optioneel)",
+          "average_price_sensor": "Daggemiddelde prijssensor (optioneel)",
           "solar_forecast_sensor": "Zonnevoorspellingssensor (kWh)",
           "max_contracted_power": "Maximaal gecontracteerd vermogen ICP (W)"
         },
         "data_description": {
+          "price_sensor": "Sensor waarvan de toestand de huidige elektriciteits prijs is. Elke sensor die de huidige periodenprijs als toestand weergeeft, werkt.",
+          "max_price_threshold": "Laden wordt geactiveerd wanneer de huidige prijs gelijk is aan of lager is dan deze waarde. Gebruik dezelfde eenheid als uw sensor. Leeg laten als u de daggemiddelde sensor gebruikt.",
+          "average_price_sensor": "Indien opgegeven, wordt deze waarde gebruikt als drempel in plaats van de vaste waarde — handig als uw prijsintegratie al een daggemiddelde blootstelt. Leeg laten voor de vaste drempel.",
           "solar_forecast_sensor": "Sensor die de zonneproductievoorspelling in kWh levert. Niet vereist als u deze sensor al in de eerste stap heeft geconfigureerd — hij wordt automatisch gebruikt.",
           "max_contracted_power": "Totaal gecontracteerd vermogen (ICP) in watt. Het systeem overschrijdt deze limiet niet bij het laden om het uitvallen van de zekering te voorkomen"
         }
@@ -398,7 +404,7 @@
           "predictive_charging_mode": "Laadmodus"
         },
         "data_description": {
-          "predictive_charging_mode": "Tijdslot: Laden tijdens een vast daltariefvenster. Dynamische prijs: Dagelijkse selectie van de goedkoopste uren op basis van Nordpool/ENTSO-e prijzen. Automatiseringsslot: Laadactivering vanuit eigen automatiseringen met elke prijssensor."
+          "predictive_charging_mode": "Tijdslot: Laden tijdens een vast daltariefvenster. Dynamische prijs: Dagelijkse selectie van de goedkoopste uren op basis van Nordpool/ENTSO-e prijzen. Realtimeprijs: Onmiddellijke activering van het laden wanneer de prijs onder de drempel daalt."
         }
       },
       "dynamic_pricing_config": {
@@ -419,14 +425,20 @@
           "max_contracted_power": "Totaal gecontracteerd vermogen (ICP) in watt. Het systeem overschrijdt deze limiet niet bij het laden om het uitvallen van de zekering te voorkomen"
         }
       },
-      "automation_slots_config": {
-        "title": "Voorspellend laden — Automatiseringsslot",
-        "description": "Parameters configureren voor automatiseringsgestuurd laden. Gebruik de meegeleverde blueprint met elke prijssensor — de blueprint activeert het laden automatisch wanneer de prijzen onder uw drempelwaarde liggen.",
+      "realtime_price_config": {
+        "title": "Voorspellend laden — Realtimeprijs",
+        "description": "Configureer de prijssensor en drempelwaarde. Het systeem leest de huidige prijs elke paar seconden en start of stopt het netwerkladen onmiddellijk — geen dagelijkse planning nodig.",
         "data": {
+          "price_sensor": "Elektriciteitsprijssensor",
+          "max_price_threshold": "Maximale prijsdrempel (optioneel)",
+          "average_price_sensor": "Daggemiddelde prijssensor (optioneel)",
           "solar_forecast_sensor": "Zonnevoorspellingssensor (kWh)",
           "max_contracted_power": "Maximaal gecontracteerd vermogen ICP (W)"
         },
         "data_description": {
+          "price_sensor": "Sensor waarvan de toestand de huidige elektriciteits prijs is. Elke sensor die de huidige periodenprijs als toestand weergeeft, werkt.",
+          "max_price_threshold": "Laden wordt geactiveerd wanneer de huidige prijs gelijk is aan of lager is dan deze waarde. Gebruik dezelfde eenheid als uw sensor. Leeg laten als u de daggemiddelde sensor gebruikt.",
+          "average_price_sensor": "Indien opgegeven, wordt deze waarde gebruikt als drempel in plaats van de vaste waarde — handig als uw prijsintegratie al een daggemiddelde blootstelt. Leeg laten voor de vaste drempel.",
           "solar_forecast_sensor": "Sensor die de zonneproductievoorspelling in kWh levert. Niet vereist als u deze sensor al in de eerste stap heeft geconfigureerd — hij wordt automatisch gebruikt.",
           "max_contracted_power": "Totaal gecontracteerd vermogen (ICP) in watt. Het systeem overschrijdt deze limiet niet bij het laden om het uitvallen van de zekering te voorkomen"
         }
@@ -541,7 +553,7 @@
       "options": {
         "time_slot": "Tijdslot",
         "dynamic_pricing": "Dynamische prijs",
-        "automation_slots": "Automatiseringsslot (externe prijssensor)"
+        "realtime_price": "Realtimeprijs (directe drempel)"
       }
     },
     "price_integration_type": {

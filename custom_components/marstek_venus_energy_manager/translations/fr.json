@@ -148,7 +148,7 @@
           "predictive_charging_mode": "Mode de charge"
         },
         "data_description": {
-          "predictive_charging_mode": "Plage horaire : Charge pendant une fenêtre à tarif heures creuses fixe. Prix dynamique : Sélection quotidienne des heures les moins chères basée sur les prix Nordpool/ENTSO-e. Slot automatique : Activation de la charge depuis vos propres automatisations avec n'importe quel capteur de prix."
+          "predictive_charging_mode": "Plage horaire : Charge pendant une fenêtre à tarif heures creuses fixe. Prix dynamique : Sélection quotidienne des heures les moins chères basée sur les prix Nordpool/ENTSO-e. Prix en temps réel : Activation immédiate de la charge quand le prix passe sous le seuil."
         }
       },
       "dynamic_pricing_config": {
@@ -169,14 +169,20 @@
           "max_contracted_power": "Puissance totale souscrite (ICP) en watts. Le système ne dépassera pas cette limite lors de la charge pour éviter de déclencher le disjoncteur"
         }
       },
-      "automation_slots_config": {
-        "title": "Charge prédictive — Slot automatique",
-        "description": "Configurez les paramètres pour la charge pilotée par des automatisations externes. Utilisez le blueprint inclus avec n'importe quel capteur de prix — le blueprint active la charge automatiquement lorsque les prix sont en dessous de votre seuil.",
+      "realtime_price_config": {
+        "title": "Charge prédictive — Prix en temps réel",
+        "description": "Configurez le capteur de prix et le seuil. Le système lit le prix actuel toutes les quelques secondes et démarre ou arrête la charge depuis le réseau immédiatement — aucune planification quotidienne nécessaire.",
         "data": {
+          "price_sensor": "Capteur de prix de l'électricité",
+          "max_price_threshold": "Seuil de prix maximum (optionnel)",
+          "average_price_sensor": "Capteur de prix moyen journalier (optionnel)",
           "solar_forecast_sensor": "Capteur de prévision solaire (kWh)",
           "max_contracted_power": "Puissance maximale souscrite ICP (W)"
         },
         "data_description": {
+          "price_sensor": "Capteur dont l'état est le prix actuel de l'électricité. Tout capteur qui expose le prix de la période courante comme son état fonctionne.",
+          "max_price_threshold": "La charge s'active quand le prix actuel est inférieur ou égal à cette valeur. Utilisez la même unité que votre capteur. Laissez vide si vous utilisez le capteur de prix moyen.",
+          "average_price_sensor": "Si renseigné, sa valeur est utilisée comme seuil à la place de la valeur fixe — utile si votre intégration de prix expose déjà un prix moyen journalier. Laissez vide pour utiliser le seuil fixe.",
           "solar_forecast_sensor": "Capteur fournissant les prévisions de production solaire en kWh. Non requis si vous avez déjà configuré ce capteur à l'étape initiale — il sera utilisé automatiquement.",
           "max_contracted_power": "Puissance totale souscrite (ICP) en watts. Le système ne dépassera pas cette limite lors de la charge pour éviter de déclencher le disjoncteur"
         }
@@ -398,7 +404,7 @@
           "predictive_charging_mode": "Mode de charge"
         },
         "data_description": {
-          "predictive_charging_mode": "Plage horaire : Charge pendant une fenêtre à tarif heures creuses fixe. Prix dynamique : Sélection quotidienne des heures les moins chères basée sur les prix Nordpool/ENTSO-e. Slot automatique : Activation de la charge depuis vos propres automatisations avec n'importe quel capteur de prix."
+          "predictive_charging_mode": "Plage horaire : Charge pendant une fenêtre à tarif heures creuses fixe. Prix dynamique : Sélection quotidienne des heures les moins chères basée sur les prix Nordpool/ENTSO-e. Prix en temps réel : Activation immédiate de la charge quand le prix passe sous le seuil."
         }
       },
       "dynamic_pricing_config": {
@@ -419,14 +425,20 @@
           "max_contracted_power": "Puissance totale souscrite (ICP) en watts. Le système ne dépassera pas cette limite lors de la charge pour éviter de déclencher le disjoncteur"
         }
       },
-      "automation_slots_config": {
-        "title": "Charge prédictive — Slot automatique",
-        "description": "Configurez les paramètres pour la charge pilotée par des automatisations externes. Utilisez le blueprint inclus avec n'importe quel capteur de prix — le blueprint active la charge automatiquement lorsque les prix sont en dessous de votre seuil.",
+      "realtime_price_config": {
+        "title": "Charge prédictive — Prix en temps réel",
+        "description": "Configurez le capteur de prix et le seuil. Le système lit le prix actuel toutes les quelques secondes et démarre ou arrête la charge depuis le réseau immédiatement — aucune planification quotidienne nécessaire.",
         "data": {
+          "price_sensor": "Capteur de prix de l'électricité",
+          "max_price_threshold": "Seuil de prix maximum (optionnel)",
+          "average_price_sensor": "Capteur de prix moyen journalier (optionnel)",
           "solar_forecast_sensor": "Capteur de prévision solaire (kWh)",
           "max_contracted_power": "Puissance maximale souscrite ICP (W)"
         },
         "data_description": {
+          "price_sensor": "Capteur dont l'état est le prix actuel de l'électricité. Tout capteur qui expose le prix de la période courante comme son état fonctionne.",
+          "max_price_threshold": "La charge s'active quand le prix actuel est inférieur ou égal à cette valeur. Utilisez la même unité que votre capteur. Laissez vide si vous utilisez le capteur de prix moyen.",
+          "average_price_sensor": "Si renseigné, sa valeur est utilisée comme seuil à la place de la valeur fixe — utile si votre intégration de prix expose déjà un prix moyen journalier. Laissez vide pour utiliser le seuil fixe.",
           "solar_forecast_sensor": "Capteur fournissant les prévisions de production solaire en kWh. Non requis si vous avez déjà configuré ce capteur à l'étape initiale — il sera utilisé automatiquement.",
           "max_contracted_power": "Puissance totale souscrite (ICP) en watts. Le système ne dépassera pas cette limite lors de la charge pour éviter de déclencher le disjoncteur"
         }
@@ -541,7 +553,7 @@
       "options": {
         "time_slot": "Plage horaire",
         "dynamic_pricing": "Prix dynamique",
-        "automation_slots": "Slot automatique (capteur de prix externe)"
+        "realtime_price": "Prix en temps réel (seuil instantané)"
       }
     },
     "price_integration_type": {

@@ -148,7 +148,7 @@
           "predictive_charging_mode": "Lademodus"
         },
         "data_description": {
-          "predictive_charging_mode": "Zeitfenster: Laden während eines festen Niedrigtarifzeitfensters. Dynamischer Preis: Tägliche Auswahl der günstigsten Stunden basierend auf Nordpool/ENTSO-e Preisen. Automatisierungs-Slot: Aktivierung der Ladung aus eigenen Automatisierungen mit jedem Preissensor."
+          "predictive_charging_mode": "Zeitfenster: Laden während eines festen Niedrigtarifzeitfensters. Dynamischer Preis: Tägliche Auswahl der günstigsten Stunden basierend auf Nordpool/ENTSO-e Preisen. Echtzeit-Preis: Sofortige Aktivierung der Ladung wenn der Preis unter den Schwellenwert fällt."
         }
       },
       "dynamic_pricing_config": {
@@ -169,14 +169,20 @@
           "max_contracted_power": "Gesamt-Vertragsleistung (ICP) in Watt. Das System überschreitet dieses Limit beim Laden nicht, um ein Auslösen der Sicherung zu vermeiden"
         }
       },
-      "automation_slots_config": {
-        "title": "Prädiktives Laden — Automatisierungs-Slot",
-        "description": "Parameter für automatisierungsgesteuertes Laden konfigurieren. Verwenden Sie den mitgelieferten Blueprint mit einem beliebigen Preissensor — der Blueprint aktiviert das Laden automatisch, wenn die Preise unter Ihrem Schwellenwert liegen.",
+      "realtime_price_config": {
+        "title": "Prädiktives Laden — Echtzeit-Preis",
+        "description": "Preissensor und Schwellenwert konfigurieren. Das System liest den aktuellen Preis alle paar Sekunden und startet oder stoppt das Netzladen sofort — ohne tägliche Planung.",
         "data": {
+          "price_sensor": "Strompreissensor",
+          "max_price_threshold": "Maximaler Preisschwellenwert (optional)",
+          "average_price_sensor": "Tagesdurchschnittspreis-Sensor (optional)",
           "solar_forecast_sensor": "Solarprognose-Sensor (kWh)",
           "max_contracted_power": "Maximale Vertragsleistung ICP (W)"
         },
         "data_description": {
+          "price_sensor": "Sensor, dessen Zustand der aktuelle Strompreis ist. Jeder Sensor, der den aktuellen Periodenpreis als Zustand anzeigt, funktioniert.",
+          "max_price_threshold": "Laden wird aktiviert, wenn der aktuelle Preis diesen Wert nicht übersteigt. Gleiche Einheit wie der Sensor verwenden. Leer lassen, wenn der Tagesdurchschnittssensor verwendet wird.",
+          "average_price_sensor": "Wenn angegeben, wird dieser Wert als Schwellenwert anstelle des fixen Wertes verwendet. Leer lassen für den fixen Schwellenwert.",
           "solar_forecast_sensor": "Sensor, der die Solarproduktionsprognose in kWh liefert. Nicht erforderlich, wenn dieser Sensor bereits im ersten Schritt konfiguriert wurde — er wird automatisch verwendet.",
           "max_contracted_power": "Gesamt-Vertragsleistung (ICP) in Watt. Das System überschreitet dieses Limit beim Laden nicht, um ein Auslösen der Sicherung zu vermeiden"
         }
@@ -398,7 +404,7 @@
           "predictive_charging_mode": "Lademodus"
         },
         "data_description": {
-          "predictive_charging_mode": "Zeitfenster: Laden während eines festen Niedrigtarifzeitfensters. Dynamischer Preis: Tägliche Auswahl der günstigsten Stunden basierend auf Nordpool/ENTSO-e Preisen. Automatisierungs-Slot: Aktivierung der Ladung aus eigenen Automatisierungen mit jedem Preissensor."
+          "predictive_charging_mode": "Zeitfenster: Laden während eines festen Niedrigtarifzeitfensters. Dynamischer Preis: Tägliche Auswahl der günstigsten Stunden basierend auf Nordpool/ENTSO-e Preisen. Echtzeit-Preis: Sofortige Aktivierung der Ladung wenn der Preis unter den Schwellenwert fällt."
         }
       },
       "dynamic_pricing_config": {
@@ -419,14 +425,20 @@
           "max_contracted_power": "Gesamt-Vertragsleistung (ICP) in Watt. Das System überschreitet dieses Limit beim Laden nicht, um ein Auslösen der Sicherung zu vermeiden"
         }
       },
-      "automation_slots_config": {
-        "title": "Prädiktives Laden — Automatisierungs-Slot",
-        "description": "Parameter für automatisierungsgesteuertes Laden konfigurieren. Verwenden Sie den mitgelieferten Blueprint mit einem beliebigen Preissensor — der Blueprint aktiviert das Laden automatisch, wenn die Preise unter Ihrem Schwellenwert liegen.",
+      "realtime_price_config": {
+        "title": "Prädiktives Laden — Echtzeit-Preis",
+        "description": "Preissensor und Schwellenwert konfigurieren. Das System liest den aktuellen Preis alle paar Sekunden und startet oder stoppt das Netzladen sofort — ohne tägliche Planung.",
         "data": {
+          "price_sensor": "Strompreissensor",
+          "max_price_threshold": "Maximaler Preisschwellenwert (optional)",
+          "average_price_sensor": "Tagesdurchschnittspreis-Sensor (optional)",
           "solar_forecast_sensor": "Solarprognose-Sensor (kWh)",
           "max_contracted_power": "Maximale Vertragsleistung ICP (W)"
         },
         "data_description": {
+          "price_sensor": "Sensor, dessen Zustand der aktuelle Strompreis ist. Jeder Sensor, der den aktuellen Periodenpreis als Zustand anzeigt, funktioniert.",
+          "max_price_threshold": "Laden wird aktiviert, wenn der aktuelle Preis diesen Wert nicht übersteigt. Gleiche Einheit wie der Sensor verwenden. Leer lassen, wenn der Tagesdurchschnittssensor verwendet wird.",
+          "average_price_sensor": "Wenn angegeben, wird dieser Wert als Schwellenwert anstelle des fixen Wertes verwendet. Leer lassen für den fixen Schwellenwert.",
           "solar_forecast_sensor": "Sensor, der die Solarproduktionsprognose in kWh liefert. Nicht erforderlich, wenn dieser Sensor bereits im ersten Schritt konfiguriert wurde — er wird automatisch verwendet.",
           "max_contracted_power": "Gesamt-Vertragsleistung (ICP) in Watt. Das System überschreitet dieses Limit beim Laden nicht, um ein Auslösen der Sicherung zu vermeiden"
         }
@@ -541,7 +553,7 @@
       "options": {
         "time_slot": "Zeitfenster",
         "dynamic_pricing": "Dynamischer Preis",
-        "automation_slots": "Automatisierungs-Slot (externer Preissensor)"
+        "realtime_price": "Echtzeit-Preis (sofortiger Schwellenwert)"
       }
     },
     "price_integration_type": {

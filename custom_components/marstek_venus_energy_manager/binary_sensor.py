@@ -266,6 +266,33 @@ class PredictiveChargingStatusSensor(BinarySensorEntity):
 
         # Dynamic pricing attributes
         attrs["pricing_mode"] = self.controller.predictive_charging_mode
+
+        # Real-time price attributes
+        if self.controller.predictive_charging_mode == "realtime_price":
+            price_state = self.controller.hass.states.get(self.controller.price_sensor) if self.controller.price_sensor else None
+            if price_state is not None:
+                try:
+                    attrs["current_price"] = float(price_state.state)
+                except (ValueError, TypeError):
+                    attrs["current_price"] = None
+            threshold = None
+            if self.controller.average_price_sensor:
+                avg_state = self.controller.hass.states.get(self.controller.average_price_sensor)
+                if avg_state is not None:
+                    try:
+                        threshold = float(avg_state.state)
+                    except (ValueError, TypeError):
+                        pass
+            if threshold is None:
+                threshold = self.controller.max_price_threshold
+            attrs["price_threshold"] = threshold
+            attrs["price_is_cheap"] = (
+                attrs.get("current_price") is not None
+                and threshold is not None
+                and attrs["current_price"] <= threshold
+            )
+            attrs["realtime_charging_active"] = getattr(self.controller, "_realtime_price_charging", False)
+
         if self.controller.predictive_charging_mode == "dynamic_pricing":
             attrs["price_data_status"] = getattr(self.controller, "_price_data_status", "not_evaluated")
 

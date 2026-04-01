@@ -65,9 +65,10 @@ from .const import (
     CONF_PRICE_SENSOR,
     CONF_PRICE_INTEGRATION_TYPE,
     CONF_MAX_PRICE_THRESHOLD,
+    CONF_AVERAGE_PRICE_SENSOR,
     PREDICTIVE_MODE_TIME_SLOT,
     PREDICTIVE_MODE_DYNAMIC_PRICING,
-    PREDICTIVE_MODE_AUTOMATION_SLOTS,
+    PREDICTIVE_MODE_REALTIME_PRICE,
     PRICE_INTEGRATION_NORDPOOL,
     PRICE_INTEGRATION_PVPC,
     PRICE_INTEGRATION_CKW,
@@ -100,7 +101,6 @@ PLATFORMS: list[Platform] = [
     Platform.NUMBER,
     Platform.SELECT,
     Platform.BUTTON,
-    Platform.TIME,
 ]
 
 
@@ -177,11 +177,9 @@ class ChargeDischargeController:
         self._grid_charging_initialized = False  # Flag for initialization
         self._last_decision_data = None  # Store last decision for diagnostics
 
-        # Automation Slots Mode state (rolling slot driven by external automations)
-        self.automation_slot_active: bool = False
-        self.automation_slot_end_time = None  # dt_time or None; written by AutomationChargingEndTimeEntity
-        self._automation_slot_notified: bool = False  # True once notification sent for current slot activation
-        self._automation_slot_evaluated_date = None  # date of last daily pre-evaluation notification
+        # Real-time Price Mode state
+        self.average_price_sensor = config_entry.data.get(CONF_AVERAGE_PRICE_SENSOR, None)
+        self._realtime_price_charging: bool = False  # True while actively charging in this mode
 
         # Dynamic Pricing Mode state
         self.predictive_charging_mode = config_entry.data.get(CONF_PREDICTIVE_CHARGING_MODE, PREDICTIVE_MODE_TIME_SLOT)
@@ -3447,114 +3445,84 @@ class ChargeDischargeController:
         # Not in a cheap slot — fall through to normal PD control (no return here)
 
     # =========================================================================
-    # AUTOMATION SLOTS: rolling slot driven by external automations / blueprint
+    # REAL-TIME PRICE: reactive charging based on current price every cycle
     # =========================================================================
 
-    def _is_in_automation_slot(self) -> bool:
-        """Return True if the rolling automation slot is active and end_time has not expired."""
-        if not self.automation_slot_active:
-            return False
-        if self.automation_slot_end_time is None:
-            return False
-        return datetime.now().time() <= self.automation_slot_end_time
+    async def _handle_realtime_price_predictive_charging(self) -> None:
+        """Handle predictive charging in real-time price mode (called every 2.5s).
 
-    def _is_automation_slots_daily_evaluation_time(self) -> bool:
-        """Return True if it's 23:00 ±5 min and we haven't evaluated today."""
-        now = datetime.now()
-        today = now.date()
-
-        if self._automation_slot_evaluated_date == today:
-            return False
-
-        eval_time = now.replace(hour=23, minute=0, second=0, microsecond=0)
-        return abs((now - eval_time).total_seconds()) <= 300  # ±5 minutes
-
-    async def _run_automation_slots_daily_evaluation(self) -> None:
-        """Daily evaluation at 23:00: assess energy balance and notify the user.
-
-        Unlike time_slot mode (which has a known slot start), this mode cannot
-        anticipate when cheap hours will occur. Instead, a daily snapshot at 23:00
-        tells the user whether grid charging is expected to be needed the next day,
-        so they know the blueprint will (or won't) activate charging.
+        Reads the current price every cycle and activates/deactivates grid charging
+        immediately when the price crosses the threshold, with no pre-scheduling.
+        If an average_price_sensor is configured its value is used as the threshold
+        instead of the fixed max_price_threshold.
         """
-        now = datetime.now()
-        _LOGGER.info("Automation slots: running daily evaluation at %s", now.strftime("%H:%M"))
-
-        decision_data = await self._should_activate_grid_charging()
-        self._last_decision_data = decision_data
-        self._automation_slot_evaluated_date = now.date()
-
-        # Forward-looking assessment: tells the user whether charging is expected
-        # to be needed, so they know if the blueprint will activate tonight.
-        await self._send_predictive_charging_notification(
-            is_pre_evaluation=True,
-            decision_data=decision_data,
-            is_daily_evaluation=True,
-        )
-
-    async def _handle_automation_slots_predictive_charging(self) -> None:
-        """Handle predictive charging in automation_slots mode (called every 2.5s).
-
-        The external automation (or blueprint) turns on the switch and sets end_time.
-        This handler activates the PD grid-charging controller while the slot is active,
-        and automatically turns off the switch when end_time expires.
-        """
-        # Daily evaluation at 23:00 — notify user whether charging will be needed
-        if self._is_automation_slots_daily_evaluation_time():
-            await self._run_automation_slots_daily_evaluation()
-
-        if not self._is_in_automation_slot():
-            if self.automation_slot_active:
-                # end_time has expired — turn off the switch from the controller side
-                switch = self.hass.data[DOMAIN][self.config_entry.entry_id].get(
-                    "automation_charging_switch"
-                )
-                if switch:
-                    switch.set_off_from_controller()
-                _LOGGER.info(
-                    "Automation charging slot end_time reached, deactivating"
-                )
-            if self.grid_charging_active or self._grid_charging_initialized:
-                _LOGGER.info("Exiting automation charging slot - returning to normal mode")
+        price_state = self.hass.states.get(self.price_sensor)
+        if price_state is None:
+            _LOGGER.debug("Real-time price: price sensor %s unavailable", self.price_sensor)
+            if self._realtime_price_charging:
+                self._realtime_price_charging = False
                 self.grid_charging_active = False
                 self._grid_charging_initialized = False
                 self.previous_power = 0
                 self.previous_error = 0
-            if self._automation_slot_notified:
-                await self.hass.services.async_call(
-                    "persistent_notification",
-                    "dismiss",
-                    {"notification_id": "predictive_charging_evaluation"},
-                )
-                self._automation_slot_notified = False
             return
 
-        # First cycle of a new slot activation — evaluate and notify
-        if not self._automation_slot_notified:
+        try:
+            current_price = float(price_state.state)
+        except (ValueError, TypeError):
+            _LOGGER.debug("Real-time price: cannot parse price state '%s'", price_state.state)
+            return
+
+        # Determine threshold: average sensor if configured, else fixed threshold
+        threshold = None
+        if self.average_price_sensor:
+            avg_state = self.hass.states.get(self.average_price_sensor)
+            if avg_state is not None:
+                try:
+                    threshold = float(avg_state.state)
+                except (ValueError, TypeError):
+                    pass
+        if threshold is None:
+            threshold = self.max_price_threshold
+
+        if threshold is None:
+            _LOGGER.debug("Real-time price: no threshold configured, skipping")
+            return
+
+        price_is_cheap = current_price <= threshold
+        _LOGGER.debug(
+            "Real-time price: current=%.4f threshold=%.4f cheap=%s charging=%s",
+            current_price, threshold, price_is_cheap, self._realtime_price_charging,
+        )
+
+        if price_is_cheap and not self._realtime_price_charging:
+            # Evaluate whether charging is actually needed before starting
+            decision_data = await self._should_activate_grid_charging()
+            self._last_decision_data = decision_data
+            if decision_data["should_charge"]:
+                self._realtime_price_charging = True
+                self._grid_charging_initialized = False
+                self.grid_charging_active = True
+                _LOGGER.info(
+                    "Real-time price: charging STARTED (price=%.4f <= threshold=%.4f)",
+                    current_price, threshold,
+                )
+            else:
+                _LOGGER.info(
+                    "Real-time price: cheap price but charging NOT needed (sufficient energy)",
+                )
+
+        elif not price_is_cheap and self._realtime_price_charging:
+            self._realtime_price_charging = False
+            self.grid_charging_active = False
             self._grid_charging_initialized = False
-            current_avg_soc = sum(c.data.get("battery_soc", 0) for c in self.coordinators if c.data) / len(self.coordinators)
-            decision_data = await self._should_activate_grid_charging()
-            self.grid_charging_active = decision_data["should_charge"]
-            self.last_evaluation_soc = current_avg_soc
-            self._last_decision_data = decision_data
-            await self._send_predictive_charging_notification(
-                is_pre_evaluation=False,
-                decision_data=decision_data,
+            self.previous_power = 0
+            self.previous_error = 0
+            _LOGGER.info(
+                "Real-time price: charging STOPPED (price=%.4f > threshold=%.4f)",
+                current_price, threshold,
             )
-            self._automation_slot_notified = True
 
-        # Re-evaluate if SOC has changed significantly since last evaluation
-        current_avg_soc = sum(c.data.get("battery_soc", 0) for c in self.coordinators if c.data) / len(self.coordinators)
-        if (self.last_evaluation_soc is not None and
-                abs(current_avg_soc - self.last_evaluation_soc) >= SOC_REEVALUATION_THRESHOLD):
-            _LOGGER.info("RE-EVALUATING automation slot charging due to SOC change (%.1f%% -> %.1f%%)",
-                         self.last_evaluation_soc, current_avg_soc)
-            decision_data = await self._should_activate_grid_charging()
-            self.grid_charging_active = decision_data["should_charge"]
-            self.last_evaluation_soc = current_avg_soc
-            self._last_decision_data = decision_data
-
-        # Slot is active — charge if decision says so, otherwise fall through to normal PD control
         if self.grid_charging_active:
             await self._handle_predictive_grid_charging()
 
@@ -3689,7 +3657,7 @@ class ChargeDischargeController:
         Args:
             is_pre_evaluation: True if pre-evaluation (1 hour before), False if initial
             decision_data: Dict from _should_activate_grid_charging() with decision factors
-            is_daily_evaluation: True when called from the daily 23:00 assessment in automation_slots mode
+            is_daily_evaluation: True when called from the daily 23:00 assessment in automation_slots mode (unused, kept for signature compatibility)
         """
         # Format the notification using the helper method
         title, message = self._format_predictive_notification_message(
@@ -3764,8 +3732,8 @@ class ChargeDischargeController:
                 # it only returns early when actively charging or overridden.
                 if self.grid_charging_active or self.predictive_charging_overridden:
                     return
-            elif self.predictive_charging_mode == PREDICTIVE_MODE_AUTOMATION_SLOTS:
-                await self._handle_automation_slots_predictive_charging()
+            elif self.predictive_charging_mode == PREDICTIVE_MODE_REALTIME_PRICE:
+                await self._handle_realtime_price_predictive_charging()
                 if self.grid_charging_active:
                     return
             else:
