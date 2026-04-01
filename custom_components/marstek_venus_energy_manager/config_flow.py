@@ -21,6 +21,7 @@ from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
+    BooleanSelector,
 )
 
 from .const import (
@@ -69,6 +70,7 @@ from .const import (
     PRICE_INTEGRATION_NORDPOOL,
     PRICE_INTEGRATION_PVPC,
     PRICE_INTEGRATION_CKW,
+    CONF_METER_INVERTED,
 )
 from .modbus_client import MarstekModbusClient
 
@@ -171,6 +173,7 @@ class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
             if not errors:
                 self.config_data["consumption_sensor"] = user_input["consumption_sensor"]
                 self.config_data[CONF_SOLAR_FORECAST_SENSOR] = forecast_sensor
+                self.config_data[CONF_METER_INVERTED] = user_input.get(CONF_METER_INVERTED, False)
                 return await self.async_step_batteries()
 
         return self.async_show_form(
@@ -179,6 +182,8 @@ class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required("consumption_sensor"):
                         EntitySelector(EntitySelectorConfig(domain="sensor")),
+                    vol.Optional(CONF_METER_INVERTED, default=False):
+                        BooleanSelector(),
                     vol.Optional(CONF_SOLAR_FORECAST_SENSOR):
                         EntitySelector(EntitySelectorConfig(domain="sensor")),
                 }
@@ -1100,11 +1105,13 @@ class OptionsFlowHandler(OptionsFlow):
                 if not errors:
                     self.config_data["consumption_sensor"] = user_input["consumption_sensor"]
                     self.config_data[CONF_SOLAR_FORECAST_SENSOR] = forecast_sensor
+                    self.config_data[CONF_METER_INVERTED] = user_input.get(CONF_METER_INVERTED, False)
                     return await self.async_step_batteries()
 
             # Load current configuration with defensive defaults
             current_sensor = self.config_entry.data.get("consumption_sensor", "")
             current_forecast = self.config_entry.data.get(CONF_SOLAR_FORECAST_SENSOR, "")
+            current_inverted = self.config_entry.data.get(CONF_METER_INVERTED, False)
         except Exception as e:
             _LOGGER.error("Error in options flow init: %s", e, exc_info=True)
             return self.async_abort(reason="unknown_error")
@@ -1115,6 +1122,8 @@ class OptionsFlowHandler(OptionsFlow):
                 {
                     vol.Required("consumption_sensor", default=current_sensor):
                         EntitySelector(EntitySelectorConfig(domain="sensor")),
+                    vol.Optional(CONF_METER_INVERTED, default=current_inverted):
+                        BooleanSelector(),
                     vol.Optional(CONF_SOLAR_FORECAST_SENSOR, default=current_forecast if current_forecast else vol.UNDEFINED):
                         EntitySelector(EntitySelectorConfig(domain="sensor")),
                 }

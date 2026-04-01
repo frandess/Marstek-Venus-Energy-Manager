@@ -38,6 +38,11 @@
 - **Unused `too_low` translation error key**: Removed the orphaned `too_low` error string (previously defined in all translation files but never raised by the Python code) from EN, ES, DE, FR, and NL translations.
 - **`user_work_mode` removed from vA/vD batteries**: The `user_work_mode` select entity (register 43000) is not supported on vA and vD hardware and has been removed from their definitions.
 
+## [1.5.1] - 2026-04-01
+
+### Added
+- **Grid meter kW auto-detection and inverted sign support**: The controller now automatically detects if the grid meter sensor reports in kW (via its `unit_of_measurement` attribute) and converts to Watts internally — no user action required. A new **"Inverted meter sign"** toggle has been added to the initial setup and options flow for meters that use the opposite sign convention (positive = export, negative = import).
+
 ## [1.4.1] - 2026-03-24
 
 ### Added

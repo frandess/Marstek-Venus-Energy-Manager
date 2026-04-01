@@ -72,6 +72,7 @@ from .const import (
     PRICE_INTEGRATION_NORDPOOL,
     PRICE_INTEGRATION_PVPC,
     PRICE_INTEGRATION_CKW,
+    CONF_METER_INVERTED,
 )
 from .coordinator import MarstekVenusDataUpdateCoordinator
 
@@ -118,6 +119,9 @@ class ChargeDischargeController:
         self.previous_sensor = None
         self.previous_power = 0
         self.first_execution = True
+
+        # Grid meter options
+        self.meter_inverted = config_entry.data.get(CONF_METER_INVERTED, False)
 
         # Load PD controller parameters from config (with backward-compatible defaults)
         self.deadband = config_entry.data.get(CONF_PD_DEADBAND, DEFAULT_PD_DEADBAND)
@@ -799,6 +803,28 @@ class ChargeDischargeController:
         except Exception:  # noqa: BLE001
             return None
 
+    def _apply_meter_transform(self, state) -> float | None:
+        """Read and transform a grid meter state.
+
+        Handles:
+        - Auto kW detection: if unit_of_measurement is 'kW', multiplies by 1000.
+        - Inverted sign: if meter_inverted is True, negates the value.
+
+        Returns the value in Watts with correct sign convention, or None on error.
+        """
+        if state is None or state.state in ("unknown", "unavailable"):
+            return None
+        try:
+            value = float(state.state)
+        except (ValueError, TypeError):
+            return None
+        unit = state.attributes.get("unit_of_measurement", "W")
+        if unit == "kW":
+            value *= 1000.0
+        if self.meter_inverted:
+            value = -value
+        return value
+
     def _detect_solar_t_start(self) -> None:
         """Detect start of solar production via grid sensor and battery state.
 
@@ -825,26 +851,22 @@ class ChargeDischargeController:
 
         # --- Primary: grid ≤ 0 and batteries not discharging ---
         grid_state = self.hass.states.get(self.consumption_sensor)
-        if grid_state and grid_state.state not in ("unknown", "unavailable"):
-            try:
-                grid_power = float(grid_state.state)
-                if grid_power <= 0:
-                    total_battery_power = sum(
-                        (c.data.get("battery_power", 0) or 0)
-                        for c in self.coordinators if c.data
-                    )
-                    if total_battery_power <= 0:
-                        self._solar_t_start = now_h
-                        self._save_solar_t_start()
-                        t_end = self._estimate_t_end()
-                        _LOGGER.info(
-                            "Charge Delay: Solar T_start detected via grid=%.0fW, battery=%.0fW "
-                            "at %.2fh, estimated T_end=%.2fh",
-                            grid_power, total_battery_power, self._solar_t_start, t_end
-                        )
-                        return
-            except (ValueError, TypeError):
-                pass
+        grid_power = self._apply_meter_transform(grid_state)
+        if grid_power is not None and grid_power <= 0:
+            total_battery_power = sum(
+                (c.data.get("battery_power", 0) or 0)
+                for c in self.coordinators if c.data
+            )
+            if total_battery_power <= 0:
+                self._solar_t_start = now_h
+                self._save_solar_t_start()
+                t_end = self._estimate_t_end()
+                _LOGGER.info(
+                    "Charge Delay: Solar T_start detected via grid=%.0fW, battery=%.0fW "
+                    "at %.2fh, estimated T_end=%.2fh",
+                    grid_power, total_battery_power, self._solar_t_start, t_end
+                )
+                return
 
         # --- Fallback: astronomical sunrise + 30 min buffer ---
         estimated_sunrise = self._calculate_sunrise()
@@ -2180,16 +2202,11 @@ class ChargeDischargeController:
         If home consumption increases, reduce battery charging to avoid exceeding ICP.
         """
         consumption_state = self.hass.states.get(self.consumption_sensor)
-        if consumption_state is None:
-            _LOGGER.warning("Consumption sensor unavailable during predictive charging")
+        sensor_raw = self._apply_meter_transform(consumption_state)
+        if sensor_raw is None:
+            _LOGGER.warning("Consumption sensor unavailable or invalid during predictive charging")
             return
-        
-        try:
-            sensor_raw = float(consumption_state.state)
-        except (ValueError, TypeError):
-            _LOGGER.warning("Invalid consumption sensor state: %s", consumption_state.state)
-            return
-        
+
         # Apply sensor filtering
         self.sensor_history.append(sensor_raw)
         if len(self.sensor_history) > self.sensor_history_size:
@@ -3740,16 +3757,14 @@ class ChargeDischargeController:
 
         # === Continue with normal PD control ===
         consumption_state = self.hass.states.get(self.consumption_sensor)
-        if consumption_state is None:
-            _LOGGER.warning(f"Consumption sensor {self.consumption_sensor} not found.")
+        sensor_raw = self._apply_meter_transform(consumption_state)
+        if sensor_raw is None:
+            if consumption_state is None:
+                _LOGGER.warning(f"Consumption sensor {self.consumption_sensor} not found.")
+            else:
+                _LOGGER.warning(f"Could not parse consumption sensor state: {consumption_state.state}")
             return
 
-        try:
-            sensor_raw = float(consumption_state.state)
-        except (ValueError, TypeError):
-            _LOGGER.warning(f"Could not parse consumption sensor state: {consumption_state.state}")
-            return
-        
         # Detect if sensor has actually updated since last cycle
         sensor_update_time = consumption_state.last_updated
         is_stale = (

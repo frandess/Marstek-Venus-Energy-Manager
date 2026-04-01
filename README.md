@@ -93,6 +93,8 @@ This integration is configured entirely via the Home Assistant UI.
 
 ### 2. Main Household Sensor
 *   **Consumption Sensor**: Select the sensor that measures your home's total grid consumption (W or kW). This is critical for the integration to calculate load and managing battery behavior relative to the grid.
+    *   **kW auto-detection**: If the sensor's `unit_of_measurement` attribute is `kW`, the integration automatically multiplies its value by 1000 — no extra configuration needed.
+    *   **Inverted meter sign** *(Optional)*: Enable this toggle if your meter uses the opposite sign convention — i.e. positive values mean export to the grid and negative values mean import. Most meters use positive = import, but some (especially certain smart meter integrations) report the opposite. Leave it off if you are unsure.
 *   **Solar Forecast Sensor** *(Optional)*: Select the sensor that provides tomorrow's solar energy production estimate (in **kWh** or **Wh**). Configuring it here makes it available to both the **Predictive Grid Charging** (step 6) and **Charge Delay** (step 8) features. You can skip this now and configure it later in those individual steps if preferred.
 
 ### 3. Battery Setup
