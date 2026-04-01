@@ -6,11 +6,13 @@
         "description": "Selecteer de sensor die het netimport/-exportvermogen meet. Optioneel kunt u de zonne-voorspellingssensor configureren voor geavanceerde functies.",
         "data": {
           "consumption_sensor": "Netverbruikssensor",
-          "solar_forecast_sensor": "Zonne-voorspellingssensor (optioneel)"
+          "solar_forecast_sensor": "Zonne-voorspellingssensor (optioneel)",
+          "meter_inverted": "Meterteken omgekeerd"
         },
         "data_description": {
           "consumption_sensor": "Sensor die geïmporteerd (+) of geëxporteerd (-) vermogen naar het net aangeeft. De controller past de batterijen aan om deze waarde dicht bij 0W te houden.",
-          "solar_forecast_sensor": "Sensor die de zonneproductievoorspelling in kWh levert (bijv. Solcast). Indien hier geconfigureerd, wordt deze automatisch gebruikt voor voorspellend laden en zonne-oplaadvertraging."
+          "solar_forecast_sensor": "Sensor die de zonneproductievoorspelling in kWh levert (bijv. Solcast). Indien hier geconfigureerd, wordt deze automatisch gebruikt voor voorspellend laden en zonne-oplaadvertraging.",
+          "meter_inverted": "Schakel deze optie in als uw meter de omgekeerde conventie gebruikt: positief = export, negatief = import. De eenheid (W/kW) wordt automatisch gedetecteerd."
         }
       },
       "batteries": {
@@ -266,11 +268,13 @@
         "description": "Wijzig de integratieconfiguratie. Wijzigingen worden toegepast bij het herstarten van de integratie.",
         "data": {
           "consumption_sensor": "Netverbruikssensor",
-          "solar_forecast_sensor": "Zonne-voorspellingssensor (optioneel)"
+          "solar_forecast_sensor": "Zonne-voorspellingssensor (optioneel)",
+          "meter_inverted": "Meterteken omgekeerd"
         },
         "data_description": {
           "consumption_sensor": "Sensor die geïmporteerd (+) of geëxporteerd (-) vermogen naar het net aangeeft.",
-          "solar_forecast_sensor": "Sensor die de zonneproductievoorspelling in kWh levert (bijv. Solcast). Indien hier geconfigureerd, wordt deze automatisch gebruikt voor voorspellend laden en zonne-oplaadvertraging."
+          "solar_forecast_sensor": "Sensor die de zonneproductievoorspelling in kWh levert (bijv. Solcast). Indien hier geconfigureerd, wordt deze automatisch gebruikt voor voorspellend laden en zonne-oplaadvertraging.",
+          "meter_inverted": "Schakel deze optie in als uw meter de omgekeerde conventie gebruikt: positief = export, negatief = import. De eenheid (W/kW) wordt automatisch gedetecteerd."
         }
       },
       "batteries": {

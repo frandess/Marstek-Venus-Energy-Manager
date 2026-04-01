@@ -1731,6 +1731,7 @@ PREDICTIVE_MODE_REALTIME_PRICE = "realtime_price"
 
 CONF_AVERAGE_PRICE_SENSOR = "average_price_sensor"
 
+CONF_METER_INVERTED = "meter_inverted"
 CONF_DP_PRICE_DISCHARGE_CONTROL = "dp_price_discharge_control"
 CONF_RT_PRICE_DISCHARGE_CONTROL = "rt_price_discharge_control"
 

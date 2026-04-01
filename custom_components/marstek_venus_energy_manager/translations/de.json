@@ -6,11 +6,13 @@
         "description": "Wählen Sie den Sensor aus, der die Netzimport-/Exportleistung misst. Optional können Sie den Solarprognose-Sensor für erweiterte Funktionen konfigurieren.",
         "data": {
           "consumption_sensor": "Netzverbrauchssensor",
-          "solar_forecast_sensor": "Solarprognose-Sensor (optional)"
+          "solar_forecast_sensor": "Solarprognose-Sensor (optional)",
+          "meter_inverted": "Zählervorzeichen invertiert"
         },
         "data_description": {
           "consumption_sensor": "Sensor, der importierte (+) oder exportierte (-) Leistung ins Netz anzeigt. Der Controller passt die Batterien an, um diesen Wert nahe 0W zu halten.",
-          "solar_forecast_sensor": "Sensor, der die Solarproduktionsprognose in kWh liefert (z.B. Solcast). Wenn hier konfiguriert, wird er automatisch für prädiktive Ladung und Solarladungsverzögerung verwendet."
+          "solar_forecast_sensor": "Sensor, der die Solarproduktionsprognose in kWh liefert (z.B. Solcast). Wenn hier konfiguriert, wird er automatisch für prädiktive Ladung und Solarladungsverzögerung verwendet.",
+          "meter_inverted": "Aktivieren Sie diese Option, wenn Ihr Zähler die umgekehrte Konvention verwendet: positiv = Export, negativ = Import. Die Einheit (W/kW) wird automatisch erkannt."
         }
       },
       "batteries": {
@@ -266,11 +268,13 @@
         "description": "Ändern Sie die Integrationskonfiguration. Änderungen werden beim Neustart der Integration angewendet.",
         "data": {
           "consumption_sensor": "Netzverbrauchssensor",
-          "solar_forecast_sensor": "Solarprognose-Sensor (optional)"
+          "solar_forecast_sensor": "Solarprognose-Sensor (optional)",
+          "meter_inverted": "Zählervorzeichen invertiert"
         },
         "data_description": {
           "consumption_sensor": "Sensor, der importierte (+) oder exportierte (-) Leistung ins Netz anzeigt.",
-          "solar_forecast_sensor": "Sensor, der die Solarproduktionsprognose in kWh liefert (z.B. Solcast). Wenn hier konfiguriert, wird er automatisch für prädiktive Ladung und Solarladungsverzögerung verwendet."
+          "solar_forecast_sensor": "Sensor, der die Solarproduktionsprognose in kWh liefert (z.B. Solcast). Wenn hier konfiguriert, wird er automatisch für prädiktive Ladung und Solarladungsverzögerung verwendet.",
+          "meter_inverted": "Aktivieren Sie diese Option, wenn Ihr Zähler die umgekehrte Konvention verwendet: positiv = Export, negativ = Import. Die Einheit (W/kW) wird automatisch erkannt."
         }
       },
       "batteries": {

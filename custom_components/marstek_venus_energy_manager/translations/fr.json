@@ -6,11 +6,13 @@
         "description": "Sélectionnez le capteur qui mesure l'importation/exportation du réseau électrique. Optionnellement, configurez le capteur de prévision solaire pour les fonctionnalités avancées.",
         "data": {
           "consumption_sensor": "Capteur de consommation réseau",
-          "solar_forecast_sensor": "Capteur de prévision solaire (optionnel)"
+          "solar_forecast_sensor": "Capteur de prévision solaire (optionnel)",
+          "meter_inverted": "Signe du compteur inversé"
         },
         "data_description": {
           "consumption_sensor": "Capteur qui indique la puissance importée (+) ou exportée (-) vers le réseau. Le contrôleur ajustera les batteries pour maintenir cette valeur proche de 0W.",
-          "solar_forecast_sensor": "Capteur fournissant la prévision de production solaire en kWh (ex : Solcast). S'il est configuré ici, il sera utilisé automatiquement pour la charge prédictive et le retard de charge solaire."
+          "solar_forecast_sensor": "Capteur fournissant la prévision de production solaire en kWh (ex : Solcast). S'il est configuré ici, il sera utilisé automatiquement pour la charge prédictive et le retard de charge solaire.",
+          "meter_inverted": "Activez cette option si votre compteur utilise la convention opposée : positif = exportation, négatif = importation. L'unité (W/kW) est détectée automatiquement."
         }
       },
       "batteries": {
@@ -266,11 +268,13 @@
         "description": "Modifiez la configuration de l'intégration. Les modifications seront appliquées lors du redémarrage de l'intégration.",
         "data": {
           "consumption_sensor": "Capteur de consommation réseau",
-          "solar_forecast_sensor": "Capteur de prévision solaire (optionnel)"
+          "solar_forecast_sensor": "Capteur de prévision solaire (optionnel)",
+          "meter_inverted": "Signe du compteur inversé"
         },
         "data_description": {
           "consumption_sensor": "Capteur qui indique la puissance importée (+) ou exportée (-) vers le réseau.",
-          "solar_forecast_sensor": "Capteur fournissant la prévision de production solaire en kWh (ex : Solcast). S'il est configuré ici, il sera utilisé automatiquement pour la charge prédictive et le retard de charge solaire."
+          "solar_forecast_sensor": "Capteur fournissant la prévision de production solaire en kWh (ex : Solcast). S'il est configuré ici, il sera utilisé automatiquement pour la charge prédictive et le retard de charge solaire.",
+          "meter_inverted": "Activez cette option si votre compteur utilise la convention opposée : positif = exportation, négatif = importation. L'unité (W/kW) est détectée automatiquement."
         }
       },
       "batteries": {
