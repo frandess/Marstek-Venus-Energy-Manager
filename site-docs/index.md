@@ -44,4 +44,4 @@
 
 Si encuentras útil esta integración, puedes apoyar el proyecto:
 
-[![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png){ height=40 }](https://buymeacoffee.com/ffunes)
+<a href="https://buymeacoffee.com/ffunes" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="40" width="145"></a>
