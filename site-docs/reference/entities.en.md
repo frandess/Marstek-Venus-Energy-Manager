@@ -17,6 +17,8 @@ The integration automatically creates entities for each configured battery and a
 | `sensor.*_battery_cycle_count_calc` | Calculated cycle count (all versions) | — |
 | `sensor.*_max_cell_voltage` | Max cell voltage (v3/vA/vD) | V |
 | `sensor.*_min_cell_voltage` | Min cell voltage (v3/vA/vD) | V |
+| `sensor.*_alarm_status` | Active alarm conditions (v2) — diagnostic | text |
+| `sensor.*_fault_status` | Active fault conditions (v2) — diagnostic | text |
 
 ## Device information sensors
 
@@ -74,5 +76,6 @@ Available under the `sensor.marstek_venus_system_*` prefix, summing values acros
 - `system_total_charging_energy` — Total system charging energy
 - `system_total_discharging_energy` — Total system discharging energy
 - `grid_at_min_soc` — Grid import during min SOC periods (kWh)
+- `system_alarm_status` — Aggregated alarm state across all batteries (`OK` / `Warning` / `Fault`); attributes list active conditions per battery
 
 ![Entity list in Home Assistant](../assets/screenshots/reference/entities-list.png){ width="700"  style="display: block; margin: 0 auto;"}

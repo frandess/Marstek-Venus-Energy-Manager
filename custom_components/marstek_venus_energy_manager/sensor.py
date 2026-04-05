@@ -51,7 +51,7 @@ from .const import (
     CONF_METER_INVERTED,
 )
 from .coordinator import MarstekVenusDataUpdateCoordinator
-from .aggregate_sensors import AGGREGATE_SENSOR_DEFINITIONS, MarstekVenusAggregateSensor, DailyGridAtMinSocSensor
+from .aggregate_sensors import AGGREGATE_SENSOR_DEFINITIONS, MarstekVenusAggregateSensor, DailyGridAtMinSocSensor, SystemAlarmSensor
 from .calculated_sensors import MarstekVenusEfficiencySensor, MarstekVenusStoredEnergySensor, MarstekVenusCycleSensor
 
 _LOGGER = logging.getLogger(__name__)
@@ -87,6 +87,11 @@ async def async_setup_entry(
     if len(coordinators) > 1:
         for definition in AGGREGATE_SENSOR_DEFINITIONS:
             entities.append(MarstekVenusAggregateSensor(coordinators, definition, entry, hass))
+
+    # System alarm sensor — only for v2 batteries (only version with alarm/fault registers)
+    v2_coordinators = [c for c in coordinators if c.battery_version == "v2"]
+    if v2_coordinators:
+        entities.append(SystemAlarmSensor(v2_coordinators))
 
     # Add calculated sensors (efficiency, stored energy, cycle count) per battery
     for coordinator in coordinators:

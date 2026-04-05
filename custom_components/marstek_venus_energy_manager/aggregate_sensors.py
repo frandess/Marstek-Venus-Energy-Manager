@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -10,7 +11,7 @@ import logging
 
 _LOGGER = logging.getLogger(__name__)
 
-from .const import DOMAIN
+from .const import DOMAIN, ALARM_BIT_DESCRIPTIONS, FAULT_BIT_DESCRIPTIONS
 from .coordinator import MarstekVenusDataUpdateCoordinator
 
 
@@ -333,3 +334,82 @@ class MarstekVenusAggregateSensor(SensorEntity):
         """Return if entity is available."""
         # Available if at least one coordinator has data
         return any(coordinator.data is not None for coordinator in self.coordinators)
+
+
+class SystemAlarmSensor(SensorEntity):
+    """System-level alarm sensor that aggregates fault/alarm status across all batteries.
+
+    State: "OK" when no active alarms or faults.
+           "Warning" when one or more alarm bits are set but no fault bits.
+           "Fault" when one or more fault bits are set on any battery.
+
+    The extra_state_attributes dict exposes per-battery active alarm/fault labels so
+    the user can see which battery is affected and what the condition is.
+    """
+
+    _attr_has_entity_name = True
+    _attr_unique_id = "marstek_venus_system_alarm_status"
+    _attr_translation_key = "system_alarm_status"
+    _attr_icon = "mdi:bell-alert"
+    _attr_should_poll = False
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinators: list[MarstekVenusDataUpdateCoordinator]) -> None:
+        """Initialize the system alarm sensor."""
+        self.coordinators = coordinators
+
+        for coordinator in coordinators:
+            coordinator.async_add_listener(self._handle_coordinator_update)
+
+    def _handle_coordinator_update(self) -> None:
+        self.async_write_ha_state()
+
+    @staticmethod
+    def _active_labels(value: int, descriptions: dict) -> list[str]:
+        return [descriptions[b] for b in range(32) if (value & (1 << b)) and b in descriptions]
+
+    @property
+    def native_value(self) -> str:
+        """Return overall alarm state across all batteries."""
+        any_fault = False
+        any_alarm = False
+        for coordinator in self.coordinators:
+            if not coordinator.data:
+                continue
+            if coordinator.data.get("fault_status") or 0:
+                any_fault = True
+            if coordinator.data.get("alarm_status") or 0:
+                any_alarm = True
+        if any_fault:
+            return "Fault"
+        if any_alarm:
+            return "Warning"
+        return "OK"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return per-battery active alarm and fault descriptions."""
+        attrs: dict = {}
+        for coordinator in self.coordinators:
+            if not coordinator.data:
+                continue
+            fault_val: int = coordinator.data.get("fault_status") or 0
+            alarm_val: int = coordinator.data.get("alarm_status") or 0
+            active: list[str] = []
+            if fault_val:
+                active += [f"[Fault] {label}" for label in self._active_labels(fault_val, FAULT_BIT_DESCRIPTIONS)]
+            if alarm_val:
+                active += [f"[Alarm] {label}" for label in self._active_labels(alarm_val, ALARM_BIT_DESCRIPTIONS)]
+            if active:
+                attrs[coordinator.name] = active
+        return attrs
+
+    @property
+    def device_info(self):
+        """Attach to the system device."""
+        return {
+            "identifiers": {(DOMAIN, "marstek_venus_system")},
+            "name": "Marstek Venus System",
+            "manufacturer": "Marstek",
+            "model": "Venus Multi-Battery System",
+        }

@@ -32,6 +32,7 @@
 - **Carga semanal completa**: carga al 100% una vez por semana para equilibrar celdas.
 - **Retraso de carga solar**: pospone la carga matutina desde la red mientras la producción solar prevista es suficiente para cubrir la energía restante necesaria.
 - **Exclusión de cargas**: excluye dispositivos de alta potencia (p. ej. cargadores de VE) para que el controlador no intente compensar su consumo.
+- **Notificaciones proactivas de alarmas (solo baterías v2)**: monitoriza los registros de fallos y alarmas de la batería cada 5 segundos y envía una notificación de Home Assistant en el momento en que se detecta una nueva condición, con el nombre exacto del fallo o alarma. El sensor de sistema `System Alarm Status` (`OK` / `Warning` / `Fault`) ofrece una vista rápida del estado de todas las baterías.
 
 ## Aviso de responsabilidad
 

@@ -17,6 +17,8 @@ La integración crea automáticamente entidades para cada batería configurada y
 | `sensor.*_battery_cycle_count_calc` | Ciclos calculados (todos) | — |
 | `sensor.*_max_cell_voltage` | Tensión máx. de celda (v3/vA/vD) | V |
 | `sensor.*_min_cell_voltage` | Tensión mín. de celda (v3/vA/vD) | V |
+| `sensor.*_alarm_status` | Condiciones de alarma activas (v2) — diagnóstico | texto |
+| `sensor.*_fault_status` | Condiciones de fallo activas (v2) — diagnóstico | texto |
 
 ## Sensores de información de dispositivo
 
@@ -74,5 +76,6 @@ Disponibles bajo el prefijo `sensor.marstek_venus_system_*`, suman los valores d
 - `system_total_charging_energy` — Energía total cargada (sistema)
 - `system_total_discharging_energy` — Energía total descargada (sistema)
 - `grid_at_min_soc` — Importación de red durante periodos en SOC mínimo (kWh)
+- `system_alarm_status` — Estado de alarma agregado de todas las baterías (`OK` / `Warning` / `Fault`); los atributos listan las condiciones activas por batería
 
 ![Lista de entidades en Home Assistant](../assets/screenshots/reference/entities-list.png){ width="700"  style="display: block; margin: 0 auto;"}

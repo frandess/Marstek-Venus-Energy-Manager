@@ -87,6 +87,52 @@ MESSAGE_WAIT_MS = {
     "vD": 150,
 }
 
+# Standalone bit-description maps — used by both sensor definitions and the
+# alarm notification / SystemAlarmSensor logic so we avoid duplicating them.
+FAULT_BIT_DESCRIPTIONS: dict[int, str] = {
+    # Register 36100 (bits 0-15)
+    0: "Grid Overvoltage",
+    1: "Grid Undervoltage",
+    2: "Grid Overfrequency",
+    3: "Grid Underfrequency",
+    4: "Grid Peak Voltage",
+    5: "Current Dcover",
+    6: "Voltage Dcover",
+    # Register 36101 (bits 16-31)
+    16: "BAT Overvoltage",
+    17: "BAT Undervoltage",
+    18: "BAT Overcurrent",
+    19: "BAT Low SOC",
+    20: "BAT Communication Failure",
+    21: "BMS Protect",
+    22: "Inverter Soft Start Timeout",
+    23: "Self-Checking Failure",
+    24: "EEPROM Failure",
+    25: "Other System Failure",
+    26: "Hardware Bus Overvoltage",
+    27: "Hardware Output Overcurrent",
+    28: "Hardware Trans Overcurrent",
+    29: "Hardware Battery Overcurrent",
+    30: "Hardware Protection",
+    31: "Output Overcurrent",
+}
+
+ALARM_BIT_DESCRIPTIONS: dict[int, str] = {
+    # Register 36000 (bits 0-15)
+    0: "PLL Abnormal Restart",
+    1: "Overtemperature Limit",
+    2: "Low Temperature Limit",
+    3: "Fan Abnormal Warning",
+    4: "Low Battery SOC Warning",
+    5: "Output Overcurrent Warning",
+    6: "Abnormal Line Sequence Detection",
+    # Register 36001 (bits 16-31)
+    16: "WiFi Abnormal",
+    17: "BLE Abnormal",
+    18: "Network Abnormal",
+    19: "CT Connection Abnormal",
+}
+
 SENSOR_DEFINITIONS = [
 
     {
@@ -296,33 +342,7 @@ SENSOR_DEFINITIONS = [
         "category": "diagnostic",
         "enabled_by_default": True,
         "scan_interval": "medium",
-        "bit_descriptions": {
-            # Register 36100 (bits 0-15)
-            0: "Grid Overvoltage",
-            1: "Grid Undervoltage",
-            2: "Grid Overfrequency",
-            3: "Grid Underfrequency",
-            4: "Grid Peak Voltage",
-            5: "Current Dcover",
-            6: "Voltage Dcover",
-            # Register 36101 (bits 16-31)
-            16: "BAT Overvoltage",
-            17: "BAT Undervoltage",
-            18: "BAT Overcurrent",
-            19: "BAT low SOC",
-            20: "BAT communication failure",
-            21: "BMS protect",
-            22: "Inverter soft start timeout",
-            23: "self-checking failure",
-            24: "eeprom failure",
-            25: "other system failure",
-            26: "Hardware Bus overvoltage",
-            27: "Hardware Output overcurrent",
-            28: "Hardware trans overcurrent",
-            29: "Hardware battery overcurrent",
-            30: "Hardware Protecion",
-            31: "Output Overcurrent"
-        }
+        "bit_descriptions": FAULT_BIT_DESCRIPTIONS
     },
     {
         # Alarm status bits indicating various device alarms
@@ -337,21 +357,7 @@ SENSOR_DEFINITIONS = [
         "unit": None,
         "precision": 0,
         "scan_interval": "medium",
-        "bit_descriptions": {
-            # Register 36000 (bits 0-15)
-            0: "PLL Abnormal Restart",
-            1: "Overtemperature Limit",
-            2: "Low Temperature Limit",
-            3: "Fan Abnormal Warning",
-            4: "Low Battery SOC Warning",
-            5: "Output Overcurrent Warning",
-            6: "Abnormal Line Sequence Detection",
-            # Register 36001 (bits 16-31)
-            16: "WiFi Abnormal",
-            17: "BLE Abnormal",
-            18: "Network Abnormal",
-            19: "CT Connection Abnormal",
-        }
+        "bit_descriptions": ALARM_BIT_DESCRIPTIONS
     },
     {
         # AC Offgrid Power in watts
