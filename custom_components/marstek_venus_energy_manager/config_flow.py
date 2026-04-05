@@ -465,9 +465,10 @@ class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
                 "power_sensor": user_input["power_sensor"],
                 "included_in_consumption": user_input.get("included_in_consumption", True),
                 "allow_solar_surplus": user_input.get("allow_solar_surplus", False),
+                "ev_charger_no_telemetry": user_input.get("ev_charger_no_telemetry", False),
             }
             self.excluded_devices.append(excluded_device)
-            
+
             # Check if user wants to add more devices (max 4)
             if len(self.excluded_devices) < 4:
                 return await self.async_step_add_more_excluded_devices()
@@ -485,6 +486,7 @@ class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
                         EntitySelector(EntitySelectorConfig(domain="sensor")),
                     vol.Required("included_in_consumption", default=True): bool,
                     vol.Optional("allow_solar_surplus", default=False): bool,
+                    vol.Optional("ev_charger_no_telemetry", default=False): bool,
                 }
             ),
             description_placeholders={
@@ -1480,9 +1482,10 @@ class OptionsFlowHandler(OptionsFlow):
                 "power_sensor": user_input["power_sensor"],
                 "included_in_consumption": user_input.get("included_in_consumption", True),
                 "allow_solar_surplus": user_input.get("allow_solar_surplus", False),
+                "ev_charger_no_telemetry": user_input.get("ev_charger_no_telemetry", False),
             }
             self.excluded_devices.append(excluded_device)
-            
+
             # Check if user wants to add more devices (max 4)
             if len(self.excluded_devices) < 4:
                 return await self.async_step_add_more_excluded_devices()
@@ -1494,17 +1497,19 @@ class OptionsFlowHandler(OptionsFlow):
         # Load existing excluded devices if available and not yet added
         current_devices = self.config_entry.data.get("excluded_devices", [])
         device_num = len(self.excluded_devices)
-        
+
         if device_num < len(current_devices):
             current_device = current_devices[device_num]
             default_sensor = current_device.get("power_sensor", "")
             default_included = current_device.get("included_in_consumption", True)
             default_allow_solar_surplus = current_device.get("allow_solar_surplus", False)
+            default_ev_no_telemetry = current_device.get("ev_charger_no_telemetry", False)
         else:
             default_sensor = ""
             default_included = True
             default_allow_solar_surplus = False
-        
+            default_ev_no_telemetry = False
+
         device_num += 1
         return self.async_show_form(
             step_id="add_excluded_device",
@@ -1514,6 +1519,7 @@ class OptionsFlowHandler(OptionsFlow):
                         EntitySelector(EntitySelectorConfig(domain="sensor")),
                     vol.Required("included_in_consumption", default=default_included): bool,
                     vol.Optional("allow_solar_surplus", default=default_allow_solar_surplus): bool,
+                    vol.Optional("ev_charger_no_telemetry", default=default_ev_no_telemetry): bool,
                 }
             ),
             description_placeholders={

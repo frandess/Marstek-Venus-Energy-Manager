@@ -101,14 +101,16 @@
         "title": "Appareil spécial {device_num}",
         "description": "Configurez comment la batterie doit gérer cet appareil.",
         "data": {
-          "power_sensor": "Capteur de puissance de l'appareil",
+          "power_sensor": "Capteur de l'appareil",
           "included_in_consumption": "La consommation est incluse dans le capteur de consommation domestique",
-          "allow_solar_surplus": "Autoriser l'utilisation du surplus solaire (ne pas charger la batterie)"
+          "allow_solar_surplus": "Autoriser l'utilisation du surplus solaire (ne pas charger la batterie)",
+          "ev_charger_no_telemetry": "Chargeur VE sans télémétrie de puissance"
         },
         "data_description": {
-          "power_sensor": "Capteur qui mesure la puissance consommée par cet appareil (en W)",
+          "power_sensor": "Capteur de puissance (W) de l'appareil. Pour les chargeurs VE sans télémétrie de puissance, sélectionnez le capteur d'état qui indique 'Charging' lorsque le véhicule charge.",
           "included_in_consumption": "✓ COCHÉ = Le capteur domestique INCLUT déjà cet appareil → La batterie ne l'alimentera PAS (exclu). ✗ DÉCOCHÉ = Le capteur domestique ne le voit pas → La batterie l'alimentera (additionnel)",
-          "allow_solar_surplus": "Si coché, l'appareil pourra consommer l'énergie directement des panneaux solaires (surplus) sans que la batterie essaie de compenser. Recommandé pour les appareils à forte consommation comme les chargeurs de VE."
+          "allow_solar_surplus": "Si coché, l'appareil pourra consommer l'énergie directement des panneaux solaires (surplus) sans que la batterie essaie de compenser. Recommandé pour les appareils à forte consommation comme les chargeurs de VE.",
+          "ev_charger_no_telemetry": "✓ COCHÉ = Le capteur sélectionné indique l'état de charge ('Charging'). Lorsqu'une charge VE est détectée, la batterie s'arrête 5 minutes afin que le véhicule puisse tirer toute la puissance disponible ; ensuite la batterie ne peut charger qu'avec le surplus solaire et ne se déchargera jamais pendant que le VE charge."
         }
       },
       "add_more_excluded_devices": {
@@ -363,14 +365,16 @@
         "title": "Appareil spécial {device_num}",
         "description": "Configurez comment la batterie doit gérer cet appareil.",
         "data": {
-          "power_sensor": "Capteur de puissance de l'appareil",
+          "power_sensor": "Capteur de l'appareil",
           "included_in_consumption": "La consommation est incluse dans le capteur de consommation domestique",
-          "allow_solar_surplus": "Autoriser l'utilisation du surplus solaire (ne pas charger la batterie)"
+          "allow_solar_surplus": "Autoriser l'utilisation du surplus solaire (ne pas charger la batterie)",
+          "ev_charger_no_telemetry": "Chargeur VE sans télémétrie de puissance"
         },
         "data_description": {
-          "power_sensor": "Capteur qui mesure la puissance consommée par cet appareil (en W)",
+          "power_sensor": "Capteur de puissance (W) de l'appareil. Pour les chargeurs VE sans télémétrie de puissance, sélectionnez le capteur d'état qui indique 'Charging' lorsque le véhicule charge.",
           "included_in_consumption": "✓ COCHÉ = Le capteur domestique INCLUT déjà cet appareil → La batterie ne l'alimentera PAS (exclu). ✗ DÉCOCHÉ = Le capteur domestique ne le voit pas → La batterie l'alimentera (additionnel)",
-          "allow_solar_surplus": "Si coché, l'appareil pourra consommer l'énergie directement des panneaux solaires (surplus) sans que la batterie essaie de compenser. Recommandé pour les appareils à forte consommation comme les chargeurs de VE."
+          "allow_solar_surplus": "Si coché, l'appareil pourra consommer l'énergie directement des panneaux solaires (surplus) sans que la batterie essaie de compenser. Recommandé pour les appareils à forte consommation comme les chargeurs de VE.",
+          "ev_charger_no_telemetry": "✓ COCHÉ = Le capteur sélectionné indique l'état de charge ('Charging'). Lorsqu'une charge VE est détectée, la batterie s'arrête 5 minutes afin que le véhicule puisse tirer toute la puissance disponible ; ensuite la batterie ne peut charger qu'avec le surplus solaire et ne se déchargera jamais pendant que le VE charge."
         }
       },
       "add_more_excluded_devices": {

@@ -46,3 +46,15 @@ automation:
 ```
 
 ![Sensor de potencia de dispositivo excluido en HA](../assets/screenshots/features/load-exclusion-entities.png){ width="700"  style="display: block; margin: 0 auto;"}
+
+## Cargador VE sin telemetría de potencia
+
+Para cargadores VE que solo exponen un sensor de estado (sin lectura de potencia en tiempo real), existe la opción **Cargador VE sin telemetría de potencia**. En lugar de leer vatios, el controlador monitoriza el estado del sensor y reacciona ante cualquier cadena de carga (`Charging`, `Cargando`, etc.).
+
+| Fase | Comportamiento de la batería |
+|---|---|
+| Estado VE → Cargando (primeros 5 min) | 0 W — carga y descarga bloqueadas, estado PD congelado |
+| VE cargando (después de 5 min) | Se permite cargar con excedente solar; descarga siempre bloqueada |
+| Estado VE → cualquier otro valor | Operación normal |
+
+Ver [Cargador VE sin telemetría de potencia](../configuration/excluded-devices.md#cargador-ve-sin-telemetría-de-potencia) en la referencia de configuración para los detalles de configuración.

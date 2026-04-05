@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.5.4] - 2026-04-05
+
+### Added
+- **EV charger without power telemetry** (new excluded-device option): A new checkbox — *EV charger without power telemetry* — is available when configuring an excluded device. When checked, the selected sensor is treated as a **state sensor** rather than a power sensor. The controller monitors it and reacts when the state changes to any recognised charging string (`Charging`, `Cargando`, `Cargando VE`, `Cargando Vehículo`, and case-insensitive variants). On detection, the battery enters a **5-minute full pause** (both charge and discharge set to 0 W, PD state frozen) so the vehicle receives the maximum available current without competition. Once the pause expires the battery may still **charge from solar surplus** but will **never discharge** while the EV remains in a charging state. Normal operation resumes automatically when the sensor leaves the charging state.
+
 ## [1.5.3] - 2026-04-05
 
 ### Added

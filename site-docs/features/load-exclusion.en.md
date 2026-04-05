@@ -46,3 +46,15 @@ automation:
 ```
 
 ![Excluded device power sensor in HA](../assets/screenshots/features/load-exclusion-entities.png){ width="700"  style="display: block; margin: 0 auto;"}
+
+## EV charger without power telemetry
+
+For EV chargers that only expose a state sensor (no real-time power reading), a dedicated **EV charger without power telemetry** option is available. Instead of reading watts, the controller monitors the sensor state and reacts to any charging string (`Charging`, `Cargando`, etc.).
+
+| Phase | Battery behaviour |
+|---|---|
+| EV state → Charging (first 5 min) | 0 W — both charge and discharge blocked, PD state frozen |
+| EV charging (after 5 min) | Charging from solar surplus allowed; discharge always blocked |
+| EV state → anything else | Normal operation |
+
+See [EV charger without power telemetry](../configuration/excluded-devices.md#ev-charger-without-power-telemetry) in the configuration reference for setup details.

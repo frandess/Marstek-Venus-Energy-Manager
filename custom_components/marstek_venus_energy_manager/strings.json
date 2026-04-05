@@ -99,14 +99,16 @@
         "title": "Dispositivo especial {device_num}",
         "description": "Configura cómo debe gestionar la batería este dispositivo.",
         "data": {
-          "power_sensor": "Sensor de potencia del dispositivo",
+          "power_sensor": "Sensor del dispositivo",
           "included_in_consumption": "El consumo está incluido en el sensor de consumo del hogar",
-          "allow_solar_surplus": "Permitir usar excedente solar (no cargar batería)"
+          "allow_solar_surplus": "Permitir usar excedente solar (no cargar batería)",
+          "ev_charger_no_telemetry": "Cargador VE sin telemetría de potencia"
         },
         "data_description": {
-          "power_sensor": "Sensor que mide la potencia consumida por este dispositivo (en W)",
+          "power_sensor": "Sensor de potencia (W) del dispositivo. Para cargadores VE sin telemetría, selecciona el sensor de estado que indica 'Charging'/'Cargando' cuando el vehículo está cargando.",
           "included_in_consumption": "✓ MARCADO = El sensor de consumo del hogar YA incluye este dispositivo → La batería NO lo alimentará (excluido). ✗ DESMARCADO = El sensor del hogar NO lo ve → La batería SÍ lo alimentará (adicional)",
-          "allow_solar_surplus": "Si se marca, el dispositivo podrá consumir energía directamente de los paneles solares (excedente) sin que la batería intente compensarlo. Se recomienda marcar para dispositivos de gran consumo como cargadores de VE."
+          "allow_solar_surplus": "Si se marca, el dispositivo podrá consumir energía directamente de los paneles solares (excedente) sin que la batería intente compensarlo. Se recomienda marcar para dispositivos de gran consumo como cargadores de VE.",
+          "ev_charger_no_telemetry": "✓ MARCADO = El sensor seleccionado indica el estado de carga ('Charging'/'Cargando'). Cuando se detecta que el VE empieza a cargar, la batería se detiene 5 minutos para que el vehículo reciba toda la potencia disponible; después la batería solo puede cargar con excedente solar y nunca descargará mientras el VE esté cargando."
         }
       },
       "add_more_excluded_devices": {
