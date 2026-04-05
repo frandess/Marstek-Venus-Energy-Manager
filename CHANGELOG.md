@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.3] - 2026-04-05
+
+### Added
+- **Proactive battery alarm notifications (v2 only)**: The integration now monitors the `Alarm Status` (register 36000) and `Fault Status` (register 36100) registers every 5 seconds and sends a Home Assistant persistent notification the moment a new alarm or fault bit is set. The notification is titled **"Battery Fault/Warning: \<name\>"** and lists both the newly triggered conditions and all currently active ones. When all alarms and faults clear, the notification is automatically dismissed. Notifications are scoped per battery (separate notification ID per battery name) so multi-battery setups report each device independently. v3, vA and vD batteries do not expose these registers via Modbus and are not affected.
+- **System Alarm Status sensor** (`sensor.marstek_venus_system_alarm_status`, **v2 only**): New sensor on the *Marstek Venus System* device that aggregates the alarm state across all batteries. State is `OK` when no conditions are active, `Warning` when one or more alarm bits are set but no fault bits, and `Fault` when at least one fault bit is active on any battery. The `extra_state_attributes` dictionary exposes per-battery detail — each key is the battery name and the value is a list of active condition labels (e.g. `[Fault] BAT Overvoltage`, `[Alarm] Fan Abnormal Warning`) — so the exact source and nature of each event is visible without opening individual battery sensors. The sensor is only populated for v2 batteries.
+- **Shared alarm/fault bit-description constants** (`FAULT_BIT_DESCRIPTIONS`, `ALARM_BIT_DESCRIPTIONS` in `const.py`): The 32-bit description maps previously duplicated inline inside `SENSOR_DEFINITIONS` are now standalone module-level dicts. The existing per-battery `Alarm Status` and `Fault Status` sensors reference these constants, eliminating the duplication and making future updates to alarm labels a single-point change.
+
 ## [1.5.2] - 2026-04-04
 
 ### Added

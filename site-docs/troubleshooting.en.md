@@ -42,6 +42,29 @@ If the problem persists, verify you are using version **1.5.0** or later.
 
 ---
 
+## Battery alarm or fault notification received
+
+The integration monitors the battery's `Alarm Status` and `Fault Status` registers (v2 only) every 5 seconds. When a new bit is set a persistent notification appears in Home Assistant with the exact condition name (e.g. *BAT Overvoltage*, *Fan Abnormal Warning*). The notification is automatically dismissed once all conditions clear.
+
+**Notification severity levels:**
+
+| Title prefix | Meaning |
+|---|---|
+| 🚨 Battery Fault | At least one fault bit is active — requires immediate attention |
+| ⚠️ Battery Warning | At least one alarm bit is active — monitor the situation |
+
+**What to do when you receive a notification:**
+
+1. Check the **`System Alarm Status`** sensor on the *Marstek Venus System* device — its attributes list which battery is affected and what conditions are active.
+2. Check the individual **Alarm Status** and **Fault Status** sensors on the affected battery device for the full current state.
+3. Consult the Marstek Venus documentation or the Marstek app for the specific fault code.
+4. If the condition does not clear automatically, consider restarting the battery or contacting Marstek support.
+
+!!! note "v2 batteries only"
+    Alarm and fault register monitoring is only available for v2 hardware. v3, vA and vD batteries do not expose these registers via Modbus.
+
+---
+
 ## Predictive charging does not activate
 
 1. Verify that the solar forecast sensor is available and has a value.

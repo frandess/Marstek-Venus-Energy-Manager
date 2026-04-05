@@ -32,6 +32,7 @@
 - **Weekly full charge**: charges to 100% once a week for cell balancing.
 - **Solar charge delay**: postpones morning grid charging while expected solar production is enough to cover the remaining energy needed.
 - **Load exclusion**: exclude high-power devices (e.g. EV chargers) so the controller does not try to compensate their consumption.
+- **Proactive alarm notifications (v2 batteries only)**: monitors battery fault and alarm registers every 5 seconds and sends a Home Assistant notification the moment a new condition is detected, with the exact fault or alarm name. A system-level `System Alarm Status` sensor (`OK` / `Warning` / `Fault`) provides an at-a-glance view across all batteries.
 
 ## Disclaimer
 
