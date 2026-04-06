@@ -103,14 +103,16 @@
         "title": "Speciaal apparaat {device_num}",
         "description": "Configureer hoe de batterij dit apparaat moet beheren.",
         "data": {
-          "power_sensor": "Apparaatvermogensensor",
+          "power_sensor": "Apparaatsensor",
           "included_in_consumption": "Verbruik is opgenomen in huisverbruikssensor",
-          "allow_solar_surplus": "Zonne-overschot gebruiken toestaan (batterij niet laden)"
+          "allow_solar_surplus": "Zonne-overschot gebruiken toestaan (batterij niet laden)",
+          "ev_charger_no_telemetry": "EV-lader zonder vermogenstelemetrie"
         },
         "data_description": {
-          "power_sensor": "Sensor die het door dit apparaat verbruikte vermogen meet (in W)",
+          "power_sensor": "Vermogenssensor (W) van het apparaat. Voor EV-laders zonder vermogenstelemetrie selecteert u de statussensor die 'Charging' aangeeft wanneer het voertuig laadt.",
           "included_in_consumption": "✓ AANGEVINKT = Huissensor bevat dit apparaat AL → Batterij zal het NIET voeden (uitgesloten). ✗ NIET AANGEVINKT = Huissensor ziet het niet → Batterij zal het voeden (extra)",
-          "allow_solar_surplus": "Indien aangevinkt, kan het apparaat energie rechtstreeks van de zonnepanelen (overschot) verbruiken zonder dat de batterij probeert te compenseren. Aanbevolen voor apparaten met hoog verbruik zoals EV-laders."
+          "allow_solar_surplus": "Indien aangevinkt, kan het apparaat energie rechtstreeks van de zonnepanelen (overschot) verbruiken zonder dat de batterij probeert te compenseren. Aanbevolen voor apparaten met hoog verbruik zoals EV-laders.",
+          "ev_charger_no_telemetry": "✓ AANGEVINKT = De geselecteerde sensor geeft de laadstatus aan ('Charging'). Wanneer EV-laden wordt gedetecteerd, pauzeert de batterij 5 minuten zodat het voertuig maximale stroom kan trekken; daarna mag de batterij alleen laden met zonne-overschot en ontlaadt nooit terwijl de EV laadt."
         }
       },
       "add_more_excluded_devices": {
@@ -367,14 +369,16 @@
         "title": "Speciaal apparaat {device_num}",
         "description": "Configureer hoe de batterij dit apparaat moet beheren.",
         "data": {
-          "power_sensor": "Apparaatvermogensensor",
+          "power_sensor": "Apparaatsensor",
           "included_in_consumption": "Verbruik is opgenomen in huisverbruikssensor",
-          "allow_solar_surplus": "Zonne-overschot gebruiken toestaan (batterij niet laden)"
+          "allow_solar_surplus": "Zonne-overschot gebruiken toestaan (batterij niet laden)",
+          "ev_charger_no_telemetry": "EV-lader zonder vermogenstelemetrie"
         },
         "data_description": {
-          "power_sensor": "Sensor die het door dit apparaat verbruikte vermogen meet (in W)",
+          "power_sensor": "Vermogenssensor (W) van het apparaat. Voor EV-laders zonder vermogenstelemetrie selecteert u de statussensor die 'Charging' aangeeft wanneer het voertuig laadt.",
           "included_in_consumption": "✓ AANGEVINKT = Huissensor bevat dit apparaat AL → Batterij zal het NIET voeden (uitgesloten). ✗ NIET AANGEVINKT = Huissensor ziet het niet → Batterij zal het voeden (extra)",
-          "allow_solar_surplus": "Indien aangevinkt, kan het apparaat energie rechtstreeks van de zonnepanelen (overschot) verbruiken zonder dat de batterij probeert te compenseren. Aanbevolen voor apparaten met hoog verbruik zoals EV-laders."
+          "allow_solar_surplus": "Indien aangevinkt, kan het apparaat energie rechtstreeks van de zonnepanelen (overschot) verbruiken zonder dat de batterij probeert te compenseren. Aanbevolen voor apparaten met hoog verbruik zoals EV-laders.",
+          "ev_charger_no_telemetry": "✓ AANGEVINKT = De geselecteerde sensor geeft de laadstatus aan ('Charging'). Wanneer EV-laden wordt gedetecteerd, pauzeert de batterij 5 minuten zodat het voertuig maximale stroom kan trekken; daarna mag de batterij alleen laden met zonne-overschot en ontlaadt nooit terwijl de EV laadt."
         }
       },
       "add_more_excluded_devices": {

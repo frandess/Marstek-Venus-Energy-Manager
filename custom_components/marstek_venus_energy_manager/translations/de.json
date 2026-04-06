@@ -103,14 +103,16 @@
         "title": "Spezielles Gerät {device_num}",
         "description": "Konfigurieren Sie, wie die Batterie dieses Gerät verwalten soll.",
         "data": {
-          "power_sensor": "Geräteleistungssensor",
+          "power_sensor": "Gerätesensor",
           "included_in_consumption": "Verbrauch ist im Hausverbrauchssensor enthalten",
-          "allow_solar_surplus": "Solarüberschuss nutzen erlauben (Batterie nicht laden)"
+          "allow_solar_surplus": "Solarüberschuss nutzen erlauben (Batterie nicht laden)",
+          "ev_charger_no_telemetry": "EV-Ladestation ohne Leistungstelemetrie"
         },
         "data_description": {
-          "power_sensor": "Sensor, der die von diesem Gerät verbrauchte Leistung misst (in W)",
+          "power_sensor": "Leistungssensor (W) des Geräts. Für EV-Ladestationen ohne Leistungstelemetrie den Statussensor auswählen, der 'Charging' anzeigt, wenn das Fahrzeug lädt.",
           "included_in_consumption": "✓ AKTIVIERT = Haussensor enthält dieses Gerät BEREITS → Batterie wird es NICHT versorgen (ausgeschlossen). ✗ DEAKTIVIERT = Haussensor sieht es nicht → Batterie wird es versorgen (zusätzlich)",
-          "allow_solar_surplus": "Wenn aktiviert, kann das Gerät Energie direkt von den Solarmodulen (Überschuss) verbrauchen, ohne dass die Batterie versucht zu kompensieren. Empfohlen für Geräte mit hohem Verbrauch wie EV-Ladestationen."
+          "allow_solar_surplus": "Wenn aktiviert, kann das Gerät Energie direkt von den Solarmodulen (Überschuss) verbrauchen, ohne dass die Batterie versucht zu kompensieren. Empfohlen für Geräte mit hohem Verbrauch wie EV-Ladestationen.",
+          "ev_charger_no_telemetry": "✓ AKTIVIERT = Der ausgewählte Sensor meldet den Ladezustand ('Charging'). Wenn ein EV-Ladevorgang erkannt wird, hält die Batterie 5 Minuten an, damit das Fahrzeug volle Leistung beziehen kann; danach darf die Batterie nur mit Solarüberschuss laden und entlädt sich nie, solange das EV lädt."
         }
       },
       "add_more_excluded_devices": {
@@ -367,14 +369,16 @@
         "title": "Spezielles Gerät {device_num}",
         "description": "Konfigurieren Sie, wie die Batterie dieses Gerät verwalten soll.",
         "data": {
-          "power_sensor": "Geräteleistungssensor",
+          "power_sensor": "Gerätesensor",
           "included_in_consumption": "Verbrauch ist im Hausverbrauchssensor enthalten",
-          "allow_solar_surplus": "Solarüberschuss nutzen erlauben (Batterie nicht laden)"
+          "allow_solar_surplus": "Solarüberschuss nutzen erlauben (Batterie nicht laden)",
+          "ev_charger_no_telemetry": "EV-Ladestation ohne Leistungstelemetrie"
         },
         "data_description": {
-          "power_sensor": "Sensor, der die von diesem Gerät verbrauchte Leistung misst (in W)",
+          "power_sensor": "Leistungssensor (W) des Geräts. Für EV-Ladestationen ohne Leistungstelemetrie den Statussensor auswählen, der 'Charging' anzeigt, wenn das Fahrzeug lädt.",
           "included_in_consumption": "✓ AKTIVIERT = Haussensor enthält dieses Gerät BEREITS → Batterie wird es NICHT versorgen (ausgeschlossen). ✗ DEAKTIVIERT = Haussensor sieht es nicht → Batterie wird es versorgen (zusätzlich)",
-          "allow_solar_surplus": "Wenn aktiviert, kann das Gerät Energie direkt von den Solarmodulen (Überschuss) verbrauchen, ohne dass die Batterie versucht zu kompensieren. Empfohlen für Geräte mit hohem Verbrauch wie EV-Ladestationen."
+          "allow_solar_surplus": "Wenn aktiviert, kann das Gerät Energie direkt von den Solarmodulen (Überschuss) verbrauchen, ohne dass die Batterie versucht zu kompensieren. Empfohlen für Geräte mit hohem Verbrauch wie EV-Ladestationen.",
+          "ev_charger_no_telemetry": "✓ AKTIVIERT = Der ausgewählte Sensor meldet den Ladezustand ('Charging'). Wenn ein EV-Ladevorgang erkannt wird, hält die Batterie 5 Minuten an, damit das Fahrzeug volle Leistung beziehen kann; danach darf die Batterie nur mit Solarüberschuss laden und entlädt sich nie, solange das EV lädt."
         }
       },
       "add_more_excluded_devices": {
