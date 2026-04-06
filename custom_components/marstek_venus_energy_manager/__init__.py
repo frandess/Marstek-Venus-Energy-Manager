@@ -173,6 +173,10 @@ class ChargeDischargeController:
         # Backup function cooldown: prevents re-entering PD control immediately after offgrid load drops.
         # Format: coordinator -> datetime (UTC) until which the battery stays excluded
         self._backup_cooldown_until: dict = {}
+
+        # EV charger no-telemetry state tracking
+        self._ev_charging_states: dict[str, bool] = {}  # sensor_id -> is EV currently charging
+        self._ev_pause_until: dict[str, Optional[datetime]] = {}  # sensor_id -> pause end time (UTC)
         
         # Predictive Grid Charging state
         self.predictive_charging_enabled = config_entry.data.get(CONF_ENABLE_PREDICTIVE_CHARGING, False)
@@ -2664,6 +2668,11 @@ class ChargeDischargeController:
 
         total_adjustment = 0.0
         for device in excluded_devices:
+            # EV chargers in no-telemetry mode expose a state sensor, not a numeric
+            # power sensor – their behaviour is handled by _check_ev_charger_state().
+            if device.get("ev_charger_no_telemetry", False):
+                continue
+
             power_sensor = device.get("power_sensor")
             if not power_sensor:
                 continue
@@ -2706,6 +2715,80 @@ class ChargeDischargeController:
                 _LOGGER.warning("Could not parse device sensor %s: %s", power_sensor, state.state)
         
         return total_adjustment
+
+    def _check_ev_charger_state(self) -> tuple[bool, bool]:
+        """Check state of EV chargers configured with no-telemetry mode.
+
+        Detects a charging state by looking for 'charg' (English) or 'cargand'
+        (Spanish) in the sensor state string (case-insensitive).
+
+        On the first cycle a charging state is detected, a 5-minute pause is
+        started so the EV can grab as much current from the grid as it needs
+        before the battery interferes.  After the pause the battery is allowed
+        to charge from solar surplus but must never discharge.
+
+        Returns:
+            (pause_active, ev_charging_active):
+            - pause_active: True if the 5-min post-detection pause is still running
+            - ev_charging_active: True if EV is charging and pause has expired
+        """
+        excluded_devices = self.config_entry.data.get("excluded_devices", [])
+        now = dt_util.utcnow()
+        pause_active = False
+        ev_charging_active = False
+
+        for device in excluded_devices:
+            if not device.get("ev_charger_no_telemetry", False):
+                continue
+
+            sensor_id = device.get("power_sensor")
+            if not sensor_id:
+                continue
+
+            state = self.hass.states.get(sensor_id)
+            if state is None or state.state in ("unknown", "unavailable"):
+                continue
+
+            state_lower = state.state.lower().strip()
+            is_charging = "charg" in state_lower or "cargand" in state_lower
+
+            prev_charging = self._ev_charging_states.get(sensor_id, False)
+
+            if is_charging and not prev_charging:
+                # EV just started charging – start 5-minute battery pause
+                self._ev_pause_until[sensor_id] = now + timedelta(minutes=5)
+                _LOGGER.info(
+                    "EV charger %s: charging detected – 5-minute battery pause started",
+                    sensor_id,
+                )
+            elif not is_charging and prev_charging:
+                # EV stopped charging – cancel any remaining pause
+                self._ev_pause_until.pop(sensor_id, None)
+                _LOGGER.info(
+                    "EV charger %s: charging stopped – normal battery operation resumed",
+                    sensor_id,
+                )
+
+            self._ev_charging_states[sensor_id] = is_charging
+
+            pause_until = self._ev_pause_until.get(sensor_id)
+            if pause_until is not None:
+                if now < pause_until:
+                    pause_active = True
+                    _LOGGER.debug(
+                        "EV charger %s: pause active, %ds remaining",
+                        sensor_id,
+                        (pause_until - now).total_seconds(),
+                    )
+                else:
+                    # Pause has expired; remove entry and switch to discharge-block mode
+                    self._ev_pause_until.pop(sensor_id, None)
+                    if is_charging:
+                        ev_charging_active = True
+            elif is_charging:
+                ev_charging_active = True
+
+        return pause_active, ev_charging_active
 
     # =========================================================================
     # DYNAMIC PRICING: Price parsing methods
@@ -4293,6 +4376,26 @@ class ChargeDischargeController:
             self._active_discharge_batteries = []
             self._active_charge_batteries = []
             operation_restricted = True  # Freeze PD state downstream (same as timeslot restriction)
+
+        # Check EV charger no-telemetry: 5-min full pause then discharge-block mode
+        if not operation_restricted:
+            ev_pause_active, ev_charging_active = self._check_ev_charger_state()
+            if ev_pause_active:
+                _LOGGER.info(
+                    "ChargeDischargeController: EV charger detected – 5-minute battery pause, forcing 0W"
+                )
+                new_power = 0
+                is_charging = False
+                self._active_discharge_batteries = []
+                self._active_charge_batteries = []
+                operation_restricted = True  # Freeze PD state during pause
+            elif ev_charging_active and new_power < 0:
+                # EV is charging (pause expired) – block discharge, solar charging still allowed
+                _LOGGER.info(
+                    "ChargeDischargeController: EV charging active – blocking battery discharge"
+                )
+                new_power = 0
+                self._active_discharge_batteries = []
 
         # Get available batteries (after checking restrictions to determine correct operation mode)
         available_batteries = self._get_available_batteries(is_charging)
