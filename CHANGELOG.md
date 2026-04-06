@@ -1,9 +1,16 @@
 # Changelog
 
-## [1.5.4] - 2026-04-05
+## [1.5.4] - 2026-04-06
 
 ### Added
+- **Configurable backup offgrid load threshold**: Each battery now has a user-configurable threshold (0–500 W, default 50 W) that determines when an offgrid load is treated as an active backup event. Batteries with small permanent loads on the offgrid port (e.g. a PoE switch, router, or cameras) were previously excluded from PD control indefinitely because any non-zero offgrid reading triggered backup mode. The threshold can be set during initial setup (per-battery limits page in the config flow) and adjusted at any time via a **Backup Offgrid Threshold** number entity on the battery device card — no reconfiguration required. Changes take effect immediately and survive restarts.
 - **EV charger without power telemetry** (new excluded-device option): A new checkbox — *EV charger without power telemetry* — is available when configuring an excluded device. When checked, the selected sensor is treated as a **state sensor** rather than a power sensor. The controller monitors it and reacts when the state changes to any recognised charging string (`Charging`, `Cargando`, `Cargando VE`, `Cargando Vehículo`, and case-insensitive variants). On detection, the battery enters a **5-minute full pause** (both charge and discharge set to 0 W, PD state frozen) so the vehicle receives the maximum available current without competition. Once the pause expires the battery may still **charge from solar surplus** but will **never discharge** while the EV remains in a charging state. Normal operation resumes automatically when the sensor leaves the charging state.
+
+### Fixed
+- **`Active Batteries` sensor always showing `Idle` when only one battery is available**: `_select_batteries_for_operation` returned early for the single-battery case without updating the `_active_charge_batteries` / `_active_discharge_batteries` tracking lists, so the diagnostic sensor always saw empty lists and displayed `Idle` regardless of actual charge/discharge state.
+- **Backup exclusion logic not applied consistently during shutdown**: The `async_unload_entry` shutdown handler used a hardcoded `!= 0` check for the offgrid power sensor instead of the per-battery threshold, meaning batteries with small permanent offgrid loads would incorrectly skip shutdown register writes and be left in an uncontrolled state on integration unload.
+
+Thanks to **[@hdcasey](https://github.com/hdcasey)** for reporting and fixing the first two issues.
 
 ## [1.5.3] - 2026-04-05
 

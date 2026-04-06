@@ -47,7 +47,8 @@
           "max_soc": "Maximaler SOC (%)",
           "min_soc": "Minimaler SOC (%)",
           "enable_charge_hysteresis": "Ladehysterese aktivieren",
-          "charge_hysteresis_percent": "Hysterese-Prozentsatz (%)"
+          "charge_hysteresis_percent": "Hysterese-Prozentsatz (%)",
+          "backup_offgrid_threshold": "Schwellenwert für Backup-Offgrid-Last (W)"
         },
         "data_description": {
           "max_charge_power": "Maximal zulässige Leistung zum Laden der Batterie",
@@ -55,7 +56,8 @@
           "max_soc": "Maximaler Ladezustand - Batterie lädt nicht über diesen Wert",
           "min_soc": "Minimaler Ladezustand - Batterie entlädt nicht unter diesen Wert",
           "enable_charge_hysteresis": "Verhindert das Laden der Batterie, wenn der SOC nahe am Maximum ist",
-          "charge_hysteresis_percent": "Batterie lädt nicht, bis der SOC auf (max_soc - Hysterese) fällt. Bsp.: Max SOC 100% mit 5% Hysterese = kein Laden bis 95%"
+          "charge_hysteresis_percent": "Batterie lädt nicht, bis der SOC auf (max_soc - Hysterese) fällt. Bsp.: Max SOC 100% mit 5% Hysterese = kein Laden bis 95%",
+          "backup_offgrid_threshold": "Eine Offgrid-Last über diesem Wert wird als aktives Backup-Ereignis behandelt und schließt die Batterie aus der PD-Regelung aus. Erhöhen, wenn dauerhafte Lasten (Router, Kameras) am Offgrid-Port angeschlossen sind."
         }
       },
       "time_slots": {
@@ -311,7 +313,8 @@
           "max_soc": "Maximaler SOC (%)",
           "min_soc": "Minimaler SOC (%)",
           "enable_charge_hysteresis": "Ladehysterese aktivieren",
-          "charge_hysteresis_percent": "Hysterese-Prozentsatz (%)"
+          "charge_hysteresis_percent": "Hysterese-Prozentsatz (%)",
+          "backup_offgrid_threshold": "Schwellenwert für Backup-Offgrid-Last (W)"
         },
         "data_description": {
           "max_charge_power": "Maximal zulässige Leistung zum Laden der Batterie",
@@ -319,7 +322,8 @@
           "max_soc": "Maximaler Ladezustand",
           "min_soc": "Minimaler Ladezustand",
           "enable_charge_hysteresis": "Verhindert das Laden der Batterie, wenn der SOC nahe am Maximum ist",
-          "charge_hysteresis_percent": "Batterie lädt nicht, bis der SOC auf (max_soc - Hysterese) fällt. Bsp.: Max SOC 100% mit 5% Hysterese = kein Laden bis 95%"
+          "charge_hysteresis_percent": "Batterie lädt nicht, bis der SOC auf (max_soc - Hysterese) fällt. Bsp.: Max SOC 100% mit 5% Hysterese = kein Laden bis 95%",
+          "backup_offgrid_threshold": "Eine Offgrid-Last über diesem Wert wird als aktives Backup-Ereignis behandelt und schließt die Batterie aus der PD-Regelung aus. Erhöhen, wenn dauerhafte Lasten (Router, Kameras) am Offgrid-Port angeschlossen sind."
         }
       },
       "time_slots": {
@@ -707,7 +711,8 @@
       "max_contracted_power": { "name": "Max. Vertragsleistung" },
       "capacity_protection_soc_threshold": { "name": "Kapazitätsschutz SOC-Schwelle" },
       "delay_safety_margin_min": { "name": "Puffer Ladungsverzögerung" },
-      "capacity_protection_limit": { "name": "Spitzenlimit Schutz" }
+      "capacity_protection_limit": { "name": "Spitzenlimit Schutz" },
+      "backup_offgrid_threshold": { "name": "Backup Offgrid Schwellenwert" }
     },
     "button": {
       "reset_device": { "name": "Gerät zurücksetzen" }
