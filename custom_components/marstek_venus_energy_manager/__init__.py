@@ -569,8 +569,16 @@ class ChargeDischargeController:
         # Switch is ON. Check whether the battery is actively providing offgrid power.
         ac_offgrid = coordinator.data.get("ac_offgrid_power")
 
-        if ac_offgrid is not None and ac_offgrid == 0:
-            # Offgrid power is 0 — check if we are still within the post-backup cooldown
+        # Small permanent loads (e.g. a PoE switch, router, or AP connected to the
+        # offgrid port) should not trigger backup exclusion. Only a substantial load
+        # — indicative of a real grid-outage scenario — warrants excluding the battery
+        # from PD control. The threshold is set conservatively at 50 W; typical
+        # standby loads (switch + AP + cameras) are well below this, while a real
+        # backup load during a grid outage will exceed it noticeably.
+        BACKUP_OFFGRID_THRESHOLD_W = 50
+
+        if ac_offgrid is not None and ac_offgrid <= BACKUP_OFFGRID_THRESHOLD_W:
+            # Offgrid power is zero or a small standby load — check post-backup cooldown
             cooldown_until = self._backup_cooldown_until.get(coordinator)
             if cooldown_until and now < cooldown_until:
                 remaining = int((cooldown_until - now).total_seconds() / 60)
@@ -583,8 +591,13 @@ class ChargeDischargeController:
             self._backup_cooldown_until.pop(coordinator, None)
             return False
 
-        # Offgrid power > 0 (or sensor not available): backup is actively running.
+        # Offgrid power > threshold (or sensor not available): backup is actively running.
         # Refresh the cooldown window so it starts counting from the last active reading.
+        if ac_offgrid is not None:
+            _LOGGER.debug(
+                "%s: Backup active — offgrid load %.0fW exceeds %.0fW threshold, excluding from PD control",
+                coordinator.name, ac_offgrid, BACKUP_OFFGRID_THRESHOLD_W
+            )
         self._backup_cooldown_until[coordinator] = now + timedelta(minutes=5)
         return True
 
@@ -2446,7 +2459,17 @@ class ChargeDischargeController:
         - Power: Activate at 60%, deactivate at 50% (~100W hysteresis band)
         """
         if len(available_batteries) <= 1:
-            return list(available_batteries)
+            # Even with a single battery, update tracking state so the Active
+            # Batteries diagnostic sensor correctly reflects charging/discharging
+            # instead of always showing "Idle".
+            selected = list(available_batteries)
+            if is_charging:
+                self._active_charge_batteries = selected
+                self._active_discharge_batteries = []
+            else:
+                self._active_discharge_batteries = selected
+                self._active_charge_batteries = []
+            return selected
 
         # No power requested — clear state and return empty
         if total_power <= 0:
