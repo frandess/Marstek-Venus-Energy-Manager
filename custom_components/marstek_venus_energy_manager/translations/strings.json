@@ -47,7 +47,8 @@
           "max_soc": "Maximum SOC (%)",
           "min_soc": "Minimum SOC (%)",
           "enable_charge_hysteresis": "Enable Charge Hysteresis",
-          "charge_hysteresis_percent": "Hysteresis Percentage (%)"
+          "charge_hysteresis_percent": "Hysteresis Percentage (%)",
+          "backup_offgrid_threshold": "Backup offgrid load threshold (W)"
         },
         "data_description": {
           "max_charge_power": "Maximum power allowed to charge the battery",
@@ -55,7 +56,8 @@
           "max_soc": "Maximum state of charge - battery won't charge above this value",
           "min_soc": "Minimum state of charge - battery won't discharge below this value",
           "enable_charge_hysteresis": "Prevents battery from charging when SOC is near maximum",
-          "charge_hysteresis_percent": "Battery will not charge until SOC drops to (max_soc - hysteresis). Ex: Max SOC 100% with 5% hysteresis = no charge until 95%"
+          "charge_hysteresis_percent": "Battery will not charge until SOC drops to (max_soc - hysteresis). Ex: Max SOC 100% with 5% hysteresis = no charge until 95%",
+          "backup_offgrid_threshold": "Offgrid load above this value is treated as an active backup event, excluding the battery from PD control. Set higher if you have permanent loads (router, cameras) on the offgrid port."
         }
       },
       "time_slots": {
@@ -309,7 +311,8 @@
           "max_soc": "Maximum SOC (%)",
           "min_soc": "Minimum SOC (%)",
           "enable_charge_hysteresis": "Enable Charge Hysteresis",
-          "charge_hysteresis_percent": "Hysteresis Percentage (%)"
+          "charge_hysteresis_percent": "Hysteresis Percentage (%)",
+          "backup_offgrid_threshold": "Backup offgrid load threshold (W)"
         },
         "data_description": {
           "max_charge_power": "Maximum power allowed to charge the battery",
@@ -317,7 +320,8 @@
           "max_soc": "Maximum state of charge",
           "min_soc": "Minimum state of charge",
           "enable_charge_hysteresis": "Prevents battery from charging when SOC is near maximum",
-          "charge_hysteresis_percent": "Battery will not charge until SOC drops to (max_soc - hysteresis). Ex: Max SOC 100% with 5% hysteresis = no charge until 95%"
+          "charge_hysteresis_percent": "Battery will not charge until SOC drops to (max_soc - hysteresis). Ex: Max SOC 100% with 5% hysteresis = no charge until 95%",
+          "backup_offgrid_threshold": "Offgrid load above this value is treated as an active backup event, excluding the battery from PD control. Set higher if you have permanent loads (router, cameras) on the offgrid port."
         }
       },
       "time_slots": {
@@ -702,7 +706,8 @@
       "max_contracted_power": { "name": "Max Contracted Power" },
       "capacity_protection_soc_threshold": { "name": "Capacity Protection SOC Threshold" },
       "delay_safety_margin_min": { "name": "Charge Delay Margin" },
-      "capacity_protection_limit": { "name": "Peak Limit Protection" }
+      "capacity_protection_limit": { "name": "Peak Limit Protection" },
+      "backup_offgrid_threshold": { "name": "Backup Offgrid Threshold" }
     },
     "button": {
       "reset_device": { "name": "Reset Device" }

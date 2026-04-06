@@ -47,7 +47,8 @@
           "max_soc": "Maximale SOC (%)",
           "min_soc": "Minimale SOC (%)",
           "enable_charge_hysteresis": "Laadhysterese inschakelen",
-          "charge_hysteresis_percent": "Hysterese percentage (%)"
+          "charge_hysteresis_percent": "Hysterese percentage (%)",
+          "backup_offgrid_threshold": "Drempelwaarde backup offgrid-belasting (W)"
         },
         "data_description": {
           "max_charge_power": "Maximaal toegestaan vermogen om de batterij op te laden",
@@ -55,7 +56,8 @@
           "max_soc": "Maximale laadtoestand - batterij laadt niet boven deze waarde",
           "min_soc": "Minimale laadtoestand - batterij ontlaadt niet onder deze waarde",
           "enable_charge_hysteresis": "Voorkomt dat de batterij laadt wanneer SOC dicht bij het maximum is",
-          "charge_hysteresis_percent": "Batterij laadt niet tot SOC daalt naar (max_soc - hysterese). Bijv.: Max SOC 100% met 5% hysterese = geen laden tot 95%"
+          "charge_hysteresis_percent": "Batterij laadt niet tot SOC daalt naar (max_soc - hysterese). Bijv.: Max SOC 100% met 5% hysterese = geen laden tot 95%",
+          "backup_offgrid_threshold": "Een offgrid-belasting boven deze waarde wordt behandeld als een actieve back-upgebeurtenis en sluit de batterij uit van PD-regeling. Verhoog dit als er permanente lasten (router, camera's) op de offgrid-poort zijn aangesloten."
         }
       },
       "time_slots": {
@@ -309,7 +311,8 @@
           "max_soc": "Maximale SOC (%)",
           "min_soc": "Minimale SOC (%)",
           "enable_charge_hysteresis": "Laadhysterese inschakelen",
-          "charge_hysteresis_percent": "Hysterese percentage (%)"
+          "charge_hysteresis_percent": "Hysterese percentage (%)",
+          "backup_offgrid_threshold": "Drempelwaarde backup offgrid-belasting (W)"
         },
         "data_description": {
           "max_charge_power": "Maximaal toegestaan vermogen om de batterij op te laden",
@@ -317,7 +320,8 @@
           "max_soc": "Maximale laadtoestand",
           "min_soc": "Minimale laadtoestand",
           "enable_charge_hysteresis": "Voorkomt dat de batterij laadt wanneer SOC dicht bij het maximum is",
-          "charge_hysteresis_percent": "Batterij laadt niet tot SOC daalt naar (max_soc - hysterese). Bijv.: Max SOC 100% met 5% hysterese = geen laden tot 95%"
+          "charge_hysteresis_percent": "Batterij laadt niet tot SOC daalt naar (max_soc - hysterese). Bijv.: Max SOC 100% met 5% hysterese = geen laden tot 95%",
+          "backup_offgrid_threshold": "Een offgrid-belasting boven deze waarde wordt behandeld als een actieve back-upgebeurtenis en sluit de batterij uit van PD-regeling. Verhoog dit als er permanente lasten (router, camera's) op de offgrid-poort zijn aangesloten."
         }
       },
       "time_slots": {
@@ -703,7 +707,8 @@
       "max_contracted_power": { "name": "Max. Gecontracteerd Vermogen" },
       "capacity_protection_soc_threshold": { "name": "SOC Drempel Capaciteitsbeveiliging" },
       "delay_safety_margin_min": { "name": "Marge Laadvertraging" },
-      "capacity_protection_limit": { "name": "Piekgrens Beveiliging" }
+      "capacity_protection_limit": { "name": "Piekgrens Beveiliging" },
+      "backup_offgrid_threshold": { "name": "Backup Offgrid Drempel" }
     },
     "button": {
       "reset_device": { "name": "Apparaat Resetten" }

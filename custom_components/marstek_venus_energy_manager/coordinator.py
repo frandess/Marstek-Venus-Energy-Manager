@@ -30,7 +30,8 @@ class MarstekVenusDataUpdateCoordinator(DataUpdateCoordinator):
                  battery_version: str = "v2",
                  max_charge_power: int = 2500, max_discharge_power: int = 2500,
                  max_soc: int = 100, min_soc: int = 12,
-                 enable_charge_hysteresis: bool = False, charge_hysteresis_percent: int = 5) -> None:
+                 enable_charge_hysteresis: bool = False, charge_hysteresis_percent: int = 5,
+                 backup_offgrid_threshold: int = 50) -> None:
         """Initialize the data update coordinator."""
         super().__init__(
             hass,
@@ -64,6 +65,7 @@ class MarstekVenusDataUpdateCoordinator(DataUpdateCoordinator):
         self.min_soc = min_soc
         self.enable_charge_hysteresis = enable_charge_hysteresis
         self.charge_hysteresis_percent = charge_hysteresis_percent
+        self.backup_offgrid_threshold = backup_offgrid_threshold
         self._hysteresis_active = False  # Tracks if battery reached max_soc (for hysteresis)
         self._scan_counter = 0
         self.lock = asyncio.Lock()

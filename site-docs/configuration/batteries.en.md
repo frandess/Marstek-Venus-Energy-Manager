@@ -21,6 +21,7 @@ Select how many Marstek Venus units you have (1–6). The integration will ask y
 | **Max SOC** | Stop charging at this percentage | `100 %` |
 | **Min SOC** | Stop discharging at this percentage | `12 %` |
 | **Charge hysteresis** | Margin to avoid rapid cycling near the charge limit | — |
+| **Backup offgrid threshold** | Minimum offgrid load (W) to be considered an active backup event | `50 W` |
 
 ### Battery versions
 
@@ -45,4 +46,19 @@ Select how many Marstek Venus units you have (1–6). The integration will ask y
 Max/min SOC and max charge/discharge power values can be adjusted at any time using the integration's sliders without reconfiguring. Changes are persisted and restored on every Home Assistant restart.
 
 ![SOC and power sliders](../assets/screenshots/configuration/battery-runtime-sliders.png){ width="650"  style="display: block; margin: 0 auto;"}
+
+---
+
+## Backup offgrid threshold at runtime
+
+The **Backup Offgrid Threshold** number entity (visible on each battery's device card, under configuration entities) lets you adjust the threshold at any time without entering the options flow. Raise it if your battery has small permanent loads on its offgrid port — such as a PoE switch, router, or IP cameras — that would otherwise keep it permanently excluded from PD control.
+
+| Load scenario | Recommended threshold |
+|---|---|
+| No permanent offgrid loads | `0 W` (any load triggers exclusion) |
+| Small standby loads (router + switch, ~20–40 W) | `50 W` (default) |
+| Heavier permanent loads (NAS, AP, cameras, ~80–120 W) | `150 W` |
+
+!!! tip "How it works"
+    When the **Backup Function** switch is ON and the measured offgrid load is **above** the threshold, the battery is excluded from PD control and manages itself autonomously. A 5-minute cooldown applies after the load drops back below the threshold, to avoid sending commands immediately after a backup event ends.
 

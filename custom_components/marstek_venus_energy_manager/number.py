@@ -29,6 +29,7 @@ async def async_setup_entry(
     for coordinator in coordinators:
         for definition in coordinator.number_definitions:
             entities.append(MarstekVenusNumber(coordinator, definition))
+        entities.append(MarstekBackupThresholdNumber(coordinator))
 
     # Add config numbers (system-level, PD parameters)
     for definition in CONFIG_NUMBER_DEFINITIONS:
@@ -189,4 +190,51 @@ class MarstekConfigNumberEntity(NumberEntity):
             "name": "Marstek Venus System",
             "manufacturer": "Marstek",
             "model": "Venus Multi-Battery System",
+        }
+
+
+class MarstekBackupThresholdNumber(CoordinatorEntity, NumberEntity):
+    """Number entity for the per-battery backup offgrid load threshold.
+
+    This value has no Modbus register — it is a software-only config parameter
+    stored in config_entry.data and read by the PD controller at runtime.
+    """
+
+    def __init__(self, coordinator: MarstekVenusDataUpdateCoordinator) -> None:
+        """Initialize the entity."""
+        super().__init__(coordinator)
+        self._attr_has_entity_name = True
+        self._attr_translation_key = "backup_offgrid_threshold"
+        self._attr_unique_id = f"{coordinator.host}_backup_offgrid_threshold"
+        self._attr_icon = "mdi:transmission-tower-off"
+        self._attr_native_unit_of_measurement = "W"
+        self._attr_native_min_value = 0
+        self._attr_native_max_value = 500
+        self._attr_native_step = 10
+        self._attr_entity_category = EntityCategory.CONFIG
+        self._attr_should_poll = False
+
+    @property
+    def native_value(self) -> float:
+        """Return the current threshold from the coordinator."""
+        return float(self.coordinator.backup_offgrid_threshold)
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Update the threshold on the coordinator and persist it."""
+        self.coordinator.backup_offgrid_threshold = int(value)
+        self.coordinator.persist_battery_config("backup_offgrid_threshold", int(value))
+        _LOGGER.info(
+            "%s: backup_offgrid_threshold updated to %dW",
+            self.coordinator.name, int(value),
+        )
+        self.async_write_ha_state()
+
+    @property
+    def device_info(self):
+        """Return device information."""
+        return {
+            "identifiers": {(DOMAIN, self.coordinator.host)},
+            "name": self.coordinator.name,
+            "manufacturer": "Marstek",
+            "model": "Venus",
         }

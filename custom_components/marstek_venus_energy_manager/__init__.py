@@ -545,8 +545,8 @@ class ChargeDischargeController:
 
         A battery is excluded when:
           - The Backup Function switch is enabled (register value == 0) AND
-          - The AC offgrid power sensor reads a non-zero value (battery is
-            actively providing offgrid power), OR the sensor is unavailable.
+          - The AC offgrid power sensor reads above the user-configured threshold
+            (default 50 W), OR the sensor is unavailable.
 
         Additionally, a 5-minute cooldown is applied after the offgrid load
         drops to 0: the battery stays excluded until the cooldown expires to
@@ -572,12 +572,10 @@ class ChargeDischargeController:
         # Small permanent loads (e.g. a PoE switch, router, or AP connected to the
         # offgrid port) should not trigger backup exclusion. Only a substantial load
         # — indicative of a real grid-outage scenario — warrants excluding the battery
-        # from PD control. The threshold is set conservatively at 50 W; typical
-        # standby loads (switch + AP + cameras) are well below this, while a real
-        # backup load during a grid outage will exceed it noticeably.
-        BACKUP_OFFGRID_THRESHOLD_W = 50
+        # from PD control. The threshold is user-configurable (default 50 W).
+        threshold = coordinator.backup_offgrid_threshold
 
-        if ac_offgrid is not None and ac_offgrid <= BACKUP_OFFGRID_THRESHOLD_W:
+        if ac_offgrid is not None and ac_offgrid <= threshold:
             # Offgrid power is zero or a small standby load — check post-backup cooldown
             cooldown_until = self._backup_cooldown_until.get(coordinator)
             if cooldown_until and now < cooldown_until:
@@ -596,7 +594,7 @@ class ChargeDischargeController:
         if ac_offgrid is not None:
             _LOGGER.debug(
                 "%s: Backup active — offgrid load %.0fW exceeds %.0fW threshold, excluding from PD control",
-                coordinator.name, ac_offgrid, BACKUP_OFFGRID_THRESHOLD_W
+                coordinator.name, ac_offgrid, threshold
             )
         self._backup_cooldown_until[coordinator] = now + timedelta(minutes=5)
         return True
@@ -4510,6 +4508,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             min_soc=battery_config["min_soc"],
             enable_charge_hysteresis=battery_config.get("enable_charge_hysteresis", False),
             charge_hysteresis_percent=battery_config.get("charge_hysteresis_percent", 5),
+            backup_offgrid_threshold=battery_config.get("backup_offgrid_threshold", 50),
         )
 
         # Restore persisted RS485 user preference and store entry reference for future persistence
@@ -4748,10 +4747,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         for coordinator in coordinators:
             try:
                 # Skip batteries that are actively providing offgrid backup power
-                # (backup switch ON and ac_offgrid_power != 0, or sensor unavailable)
+                # (backup switch ON and ac_offgrid_power exceeds threshold, or sensor unavailable)
                 if coordinator.data and coordinator.data.get("backup_function") == 0:
                     ac_offgrid = coordinator.data.get("ac_offgrid_power")
-                    if ac_offgrid is None or ac_offgrid != 0:
+                    if ac_offgrid is None or ac_offgrid > coordinator.backup_offgrid_threshold:
                         _LOGGER.info("%s: Skipping shutdown writes - backup function active with offgrid load", coordinator.name)
                         continue
 

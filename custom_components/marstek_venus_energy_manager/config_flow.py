@@ -279,6 +279,7 @@ class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
             merged["min_soc"] = int(user_input["min_soc"])
             merged["enable_charge_hysteresis"] = user_input["enable_charge_hysteresis"]
             merged["charge_hysteresis_percent"] = int(user_input.get("charge_hysteresis_percent", 5))
+            merged["backup_offgrid_threshold"] = int(user_input.get("backup_offgrid_threshold", 50))
             self.battery_configs.append(merged)
             self.battery_index += 1
 
@@ -302,6 +303,8 @@ class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
                     vol.Required("enable_charge_hysteresis", default=False): bool,
                     vol.Optional("charge_hysteresis_percent", default=5):
                         NumberSelector(NumberSelectorConfig(min=5, max=20, step=1, mode=NumberSelectorMode.SLIDER)),
+                    vol.Required("backup_offgrid_threshold", default=50):
+                        NumberSelector(NumberSelectorConfig(min=0, max=500, step=10, unit_of_measurement="W", mode=NumberSelectorMode.SLIDER)),
                 }
             ),
             description_placeholders={"battery_num": str(battery_num)},
@@ -1249,6 +1252,7 @@ class OptionsFlowHandler(OptionsFlow):
                 merged["min_soc"] = int(user_input["min_soc"])
                 merged["enable_charge_hysteresis"] = user_input["enable_charge_hysteresis"]
                 merged["charge_hysteresis_percent"] = int(user_input.get("charge_hysteresis_percent", 5))
+                merged["backup_offgrid_threshold"] = int(user_input.get("backup_offgrid_threshold", 50))
                 self.battery_configs.append(merged)
                 self.battery_index += 1
 
@@ -1267,6 +1271,7 @@ class OptionsFlowHandler(OptionsFlow):
                     "min_soc": current_battery.get("min_soc", 12),
                     "enable_charge_hysteresis": current_battery.get("enable_charge_hysteresis", False),
                     "charge_hysteresis_percent": current_battery.get("charge_hysteresis_percent", 5),
+                    "backup_offgrid_threshold": current_battery.get("backup_offgrid_threshold", 50),
                 }
             else:
                 defaults = {
@@ -1276,6 +1281,7 @@ class OptionsFlowHandler(OptionsFlow):
                     "min_soc": 12,
                     "enable_charge_hysteresis": False,
                     "charge_hysteresis_percent": 5,
+                    "backup_offgrid_threshold": 50,
                 }
         except Exception as e:
             _LOGGER.error("Error in options flow battery_limits step: %s", e, exc_info=True)
@@ -1296,6 +1302,8 @@ class OptionsFlowHandler(OptionsFlow):
                     vol.Required("enable_charge_hysteresis", default=defaults["enable_charge_hysteresis"]): bool,
                     vol.Optional("charge_hysteresis_percent", default=defaults["charge_hysteresis_percent"]):
                         NumberSelector(NumberSelectorConfig(min=5, max=20, step=1, mode=NumberSelectorMode.SLIDER)),
+                    vol.Required("backup_offgrid_threshold", default=defaults["backup_offgrid_threshold"]):
+                        NumberSelector(NumberSelectorConfig(min=0, max=500, step=10, unit_of_measurement="W", mode=NumberSelectorMode.SLIDER)),
                 }
             ),
             description_placeholders={"battery_num": str(battery_num)},
