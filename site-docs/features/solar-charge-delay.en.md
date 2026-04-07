@@ -1,6 +1,6 @@
 # Solar charge delay
 
-Delays morning grid charging while the expected solar production is sufficient to cover the required energy. Avoids buying grid energy that would later be displaced by solar.
+Delays morning battery charging (both from solar and from the grid) while the expected solar production is sufficient to cover the required energy. Avoids charging the battery early — whether from solar or the grid — when the sun will be able to do it later.
 
 ## When it applies
 
@@ -15,7 +15,7 @@ The integration uses a **sinusoidal model** based on the stored overnight foreca
 If remaining_solar_production >= energy_to_charge:
     Wait (the sun will charge it)
 Else:
-    Start grid charging
+    Start charging (solar or grid)
 ```
 
 ## Stored overnight forecast

@@ -1,6 +1,6 @@
 # Retraso de carga solar
 
-Retrasa la carga matutina desde la red mientras la producción solar prevista sea suficiente para cubrir la energía necesaria. Evita comprar energía de la red que luego sería desplazada por la solar.
+Retrasa la carga matutina de la batería (tanto solar como desde la red) mientras la producción solar prevista sea suficiente para cubrir la energía necesaria. Evita cargar la batería a primera hora —ya sea con solar o con red— cuando el sol podrá hacerlo más tarde.
 
 ## Aplicación
 
@@ -15,7 +15,7 @@ La integración usa un **modelo sinusoidal** basado en la previsión nocturna al
 Si producción_solar_restante >= energía_a_cargar:
     Esperar (el sol lo cargará)
 Si no:
-    Iniciar carga desde la red
+    Iniciar carga (solar o desde la red)
 ```
 
 ## Previsión nocturna almacenada

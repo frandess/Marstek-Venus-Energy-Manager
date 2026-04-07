@@ -46,3 +46,4 @@ temp_d.yaml
 .claude/settings.local.json
 .agents/workflows/github_flow.md
 /_site
+CLAUDE.md.bck
