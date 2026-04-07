@@ -124,7 +124,7 @@
       },
       "predictive_charging": {
         "title": "Carga predictiva desde red",
-        "description": "¿Deseas activar la carga inteligente desde red? Esta función permite cargar las baterías automáticamente durante horas valle cuando la predicción solar del día siguiente es insuficiente.",
+        "description": "¿Deseas activar la carga inteligente desde red? Esta función permite cargar las baterías automáticamente durante horas valle cuando la predicción solar del día de hoy es insuficiente.",
         "data": {
           "configure_predictive_charging": "Configurar carga predictiva"
         }
@@ -392,7 +392,7 @@
       },
       "predictive_charging": {
         "title": "Carga predictiva desde red",
-        "description": "¿Deseas activar la carga inteligente desde red? Esta función permite cargar las baterías automáticamente durante horas valle cuando la predicción solar del día siguiente es insuficiente.",
+        "description": "¿Deseas activar la carga inteligente desde red? Esta función permite cargar las baterías automáticamente durante horas valle cuando la predicción solar del día de hoy es insuficiente.",
         "data": {
           "configure_predictive_charging": "Configurar carga predictiva"
         }

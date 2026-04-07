@@ -124,7 +124,7 @@
       },
       "predictive_charging": {
         "title": "Prädiktive Netzladung",
-        "description": "Möchten Sie intelligentes Netzladen aktivieren? Diese Funktion ermöglicht das Laden der Batterien aus dem Netz während der Niedrigtarifzeiten, wenn die Solarprognose für den nächsten Tag unzureichend ist.",
+        "description": "Möchten Sie intelligentes Netzladen aktivieren? Diese Funktion ermöglicht das Laden der Batterien aus dem Netz während der Niedrigtarifzeiten, wenn die Solarprognose für heute unzureichend ist.",
         "data": {
           "configure_predictive_charging": "Prädiktive Ladung konfigurieren"
         }
@@ -392,7 +392,7 @@
       },
       "predictive_charging": {
         "title": "Prädiktive Netzladung",
-        "description": "Möchten Sie intelligentes Netzladen aktivieren? Diese Funktion ermöglicht das Laden der Batterien aus dem Netz während der Niedrigtarifzeiten, wenn die Solarprognose für den nächsten Tag unzureichend ist.",
+        "description": "Möchten Sie intelligentes Netzladen aktivieren? Diese Funktion ermöglicht das Laden der Batterien aus dem Netz während der Niedrigtarifzeiten, wenn die Solarprognose für heute unzureichend ist.",
         "data": {
           "configure_predictive_charging": "Prädiktive Ladung konfigurieren"
         }
