@@ -629,7 +629,8 @@
           "disabled": "Disabled",
           "waiting_for_solar": "Waiting for solar",
           "delayed": "Delayed",
-          "charging_allowed": "Charging allowed"
+          "charging_allowed": "Charging allowed",
+          "charging_to_setpoint": "Charging to setpoint"
         }
       },
       "battery_soc": { "name": "Battery SOC" },

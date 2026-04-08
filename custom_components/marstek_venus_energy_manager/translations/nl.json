@@ -634,7 +634,8 @@
           "disabled": "Uitgeschakeld",
           "waiting_for_solar": "Wachten op zon",
           "delayed": "Vertraagd",
-          "charging_allowed": "Laden toegestaan"
+          "charging_allowed": "Laden toegestaan",
+          "charging_to_setpoint": "Laden tot setpoint"
         }
       },
       "battery_soc": { "name": "Batterij SOC" },

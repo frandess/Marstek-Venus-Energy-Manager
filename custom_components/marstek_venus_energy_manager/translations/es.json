@@ -634,7 +634,8 @@
           "disabled": "Desactivado",
           "waiting_for_solar": "Esperando solar",
           "delayed": "Retrasado",
-          "charging_allowed": "Carga permitida"
+          "charging_allowed": "Carga permitida",
+          "charging_to_setpoint": "Cargando hasta setpoint"
         }
       },
       "battery_soc": { "name": "SOC de la Batería" },
