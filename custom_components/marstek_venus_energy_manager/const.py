@@ -1710,6 +1710,10 @@ CONF_ENABLE_WEEKLY_FULL_CHARGE_DELAY = "enable_weekly_full_charge_delay"
 CONF_ENABLE_CHARGE_DELAY = "enable_charge_delay"
 CONF_DELAY_SAFETY_MARGIN_MIN = "delay_safety_margin_min"
 DEFAULT_DELAY_SAFETY_MARGIN_MIN = 60
+CONF_DELAY_SOC_SETPOINT_ENABLED = "delay_soc_setpoint_enabled"
+DEFAULT_DELAY_SOC_SETPOINT_ENABLED = False
+CONF_DELAY_SOC_SETPOINT = "delay_soc_setpoint"
+DEFAULT_DELAY_SOC_SETPOINT = 50  # % — default when the setpoint is enabled
 
 # Weekly Full Charge Delay Constants
 CHARGE_EFFICIENCY = 0.85  # Conservative factor for charge power estimation
@@ -1865,6 +1869,17 @@ CONFIG_NUMBER_DEFINITIONS = [
         "default": DEFAULT_DELAY_SAFETY_MARGIN_MIN,
         "icon": "mdi:timer-sand",
         "condition": CONF_ENABLE_CHARGE_DELAY,
+    },
+    {
+        "key": CONF_DELAY_SOC_SETPOINT,
+        "name": "Charge Delay SOC Setpoint",
+        "min": 12,
+        "max": 90,
+        "step": 5,
+        "unit": "%",
+        "default": DEFAULT_DELAY_SOC_SETPOINT,
+        "icon": "mdi:battery-charging-50",
+        "condition": CONF_DELAY_SOC_SETPOINT_ENABLED,
     },
     {
         "key": CONF_CAPACITY_PROTECTION_SOC_THRESHOLD,

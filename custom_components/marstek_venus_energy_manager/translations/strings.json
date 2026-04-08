@@ -124,7 +124,7 @@
       },
       "predictive_charging": {
         "title": "Predictive Grid Charging",
-        "description": "Do you want to enable intelligent grid charging? This feature allows charging batteries from the grid during off-peak hours when the solar forecast for the next day is insufficient.",
+        "description": "Do you want to enable intelligent grid charging? This feature allows charging batteries from the grid during off-peak hours when today's solar forecast is insufficient.",
         "data": {
           "configure_predictive_charging": "Configure predictive charging"
         }
@@ -226,10 +226,12 @@
         "description": "Configure the safety margin and solar forecast sensor for the charge delay.",
         "data": {
           "delay_safety_margin_h": "Safety margin (hours)",
+          "delay_soc_setpoint": "Minimum SOC before delay (%)",
           "solar_forecast_sensor": "Solar forecast sensor"
         },
         "data_description": {
           "delay_safety_margin_h": "Hours before sunset by which charging must be complete. Higher values unlock charging earlier.",
+          "delay_soc_setpoint": "The battery will charge freely up to this SOC. Above it, the solar delay activates. Set to 0 to apply the delay from the start.",
           "solar_forecast_sensor": "Sensor providing solar production forecast in kWh (e.g., Solcast). Not required if you already configured this sensor in the initial setup step — it will be used automatically."
         }
       },
@@ -390,7 +392,7 @@
       },
       "predictive_charging": {
         "title": "Predictive Grid Charging",
-        "description": "Do you want to enable intelligent grid charging? This feature allows charging batteries from the grid during off-peak hours when the solar forecast for the next day is insufficient.",
+        "description": "Do you want to enable intelligent grid charging? This feature allows charging batteries from the grid during off-peak hours when today's solar forecast is insufficient.",
         "data": {
           "configure_predictive_charging": "Configure predictive charging"
         }
@@ -492,10 +494,12 @@
         "description": "Configure the safety margin and solar forecast sensor for the charge delay.",
         "data": {
           "delay_safety_margin_h": "Safety margin (hours)",
+          "delay_soc_setpoint": "Minimum SOC before delay (%)",
           "solar_forecast_sensor": "Solar forecast sensor"
         },
         "data_description": {
           "delay_safety_margin_h": "Hours before sunset by which charging must be complete. Higher values unlock charging earlier.",
+          "delay_soc_setpoint": "The battery will charge freely up to this SOC. Above it, the solar delay activates. Set to 0 to apply the delay from the start.",
           "solar_forecast_sensor": "Sensor providing solar production forecast in kWh (e.g., Solcast). Not required if you already configured this sensor in the initial setup step — it will be used automatically."
         }
       },
@@ -625,7 +629,8 @@
           "disabled": "Disabled",
           "waiting_for_solar": "Waiting for solar",
           "delayed": "Delayed",
-          "charging_allowed": "Charging allowed"
+          "charging_allowed": "Charging allowed",
+          "charging_to_setpoint": "Charging to setpoint"
         }
       },
       "battery_soc": { "name": "Battery SOC" },
@@ -710,6 +715,7 @@
       "max_contracted_power": { "name": "Max Contracted Power" },
       "capacity_protection_soc_threshold": { "name": "Capacity Protection SOC Threshold" },
       "delay_safety_margin_min": { "name": "Charge Delay Margin" },
+      "delay_soc_setpoint": { "name": "Charge Delay SOC Setpoint" },
       "capacity_protection_limit": { "name": "Peak Limit Protection" },
       "backup_offgrid_threshold": { "name": "Backup Offgrid Threshold" }
     },

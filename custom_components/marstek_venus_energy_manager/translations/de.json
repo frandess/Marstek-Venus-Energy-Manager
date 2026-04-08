@@ -124,7 +124,7 @@
       },
       "predictive_charging": {
         "title": "Prädiktive Netzladung",
-        "description": "Möchten Sie intelligentes Netzladen aktivieren? Diese Funktion ermöglicht das Laden der Batterien aus dem Netz während der Niedrigtarifzeiten, wenn die Solarprognose für den nächsten Tag unzureichend ist.",
+        "description": "Möchten Sie intelligentes Netzladen aktivieren? Diese Funktion ermöglicht das Laden der Batterien aus dem Netz während der Niedrigtarifzeiten, wenn die Solarprognose für heute unzureichend ist.",
         "data": {
           "configure_predictive_charging": "Prädiktive Ladung konfigurieren"
         }
@@ -226,10 +226,14 @@
         "description": "Konfigurieren Sie den Sicherheitspuffer und den Solarprognose-Sensor für die Ladungsverzögerung.",
         "data": {
           "delay_safety_margin_h": "Sicherheitspuffer (Stunden)",
+          "delay_soc_setpoint_enabled": "Mindest-SOC vor Verzögerung aktivieren",
+          "delay_soc_setpoint": "Mindest-SOC (%)",
           "solar_forecast_sensor": "Solarprognose-Sensor"
         },
         "data_description": {
           "delay_safety_margin_h": "Stunden vor Sonnenuntergang, bis zu denen die Ladung abgeschlossen sein muss. Höhere Werte entsperren das Laden früher.",
+          "delay_soc_setpoint_enabled": "Wenn aktiviert, lädt die Batterie frei bis zum konfigurierten SOC; darüber wird die Solarladungsverzögerung aktiviert.",
+          "delay_soc_setpoint": "SOC, den die Batterie erreichen muss, bevor die Solarladungsverzögerung greift. Mindestwert: 12 % (Mindest-Entlade-SOC der Venus-Batterien).",
           "solar_forecast_sensor": "Sensor, der die Solarproduktionsprognose in kWh liefert (z.B. Solcast). Nicht erforderlich, wenn dieser Sensor bereits im ersten Schritt konfiguriert wurde — er wird automatisch verwendet."
         }
       },
@@ -390,7 +394,7 @@
       },
       "predictive_charging": {
         "title": "Prädiktive Netzladung",
-        "description": "Möchten Sie intelligentes Netzladen aktivieren? Diese Funktion ermöglicht das Laden der Batterien aus dem Netz während der Niedrigtarifzeiten, wenn die Solarprognose für den nächsten Tag unzureichend ist.",
+        "description": "Möchten Sie intelligentes Netzladen aktivieren? Diese Funktion ermöglicht das Laden der Batterien aus dem Netz während der Niedrigtarifzeiten, wenn die Solarprognose für heute unzureichend ist.",
         "data": {
           "configure_predictive_charging": "Prädiktive Ladung konfigurieren"
         }
@@ -492,10 +496,14 @@
         "description": "Konfigurieren Sie den Sicherheitspuffer und den Solarprognose-Sensor für die Ladungsverzögerung.",
         "data": {
           "delay_safety_margin_h": "Sicherheitspuffer (Stunden)",
+          "delay_soc_setpoint_enabled": "Mindest-SOC vor Verzögerung aktivieren",
+          "delay_soc_setpoint": "Mindest-SOC (%)",
           "solar_forecast_sensor": "Solarprognose-Sensor"
         },
         "data_description": {
           "delay_safety_margin_h": "Stunden vor Sonnenuntergang, bis zu denen die Ladung abgeschlossen sein muss. Höhere Werte entsperren das Laden früher.",
+          "delay_soc_setpoint_enabled": "Wenn aktiviert, lädt die Batterie frei bis zum konfigurierten SOC; darüber wird die Solarladungsverzögerung aktiviert.",
+          "delay_soc_setpoint": "SOC, den die Batterie erreichen muss, bevor die Solarladungsverzögerung greift. Mindestwert: 12 % (Mindest-Entlade-SOC der Venus-Batterien).",
           "solar_forecast_sensor": "Sensor, der die Solarproduktionsprognose in kWh liefert (z.B. Solcast). Nicht erforderlich, wenn dieser Sensor bereits im ersten Schritt konfiguriert wurde — er wird automatisch verwendet."
         }
       },
@@ -626,7 +634,8 @@
           "disabled": "Deaktiviert",
           "waiting_for_solar": "Warte auf Solar",
           "delayed": "Verzögert",
-          "charging_allowed": "Laden erlaubt"
+          "charging_allowed": "Laden erlaubt",
+          "charging_to_setpoint": "Laden bis Sollwert"
         }
       },
       "battery_soc": { "name": "Batterie-SOC" },
@@ -711,6 +720,7 @@
       "max_contracted_power": { "name": "Max. Vertragsleistung" },
       "capacity_protection_soc_threshold": { "name": "Kapazitätsschutz SOC-Schwelle" },
       "delay_safety_margin_min": { "name": "Puffer Ladungsverzögerung" },
+      "delay_soc_setpoint": { "name": "SOC-Schwellwert Ladungsverzögerung" },
       "capacity_protection_limit": { "name": "Spitzenlimit Schutz" },
       "backup_offgrid_threshold": { "name": "Backup Offgrid Schwellenwert" }
     },

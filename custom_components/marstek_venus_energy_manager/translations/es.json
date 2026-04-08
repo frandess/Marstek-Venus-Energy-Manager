@@ -124,7 +124,7 @@
       },
       "predictive_charging": {
         "title": "Carga predictiva desde red",
-        "description": "¿Deseas activar la carga inteligente desde red? Esta función permite cargar las baterías automáticamente durante horas valle cuando la predicción solar del día siguiente es insuficiente.",
+        "description": "¿Deseas activar la carga inteligente desde red? Esta función permite cargar las baterías automáticamente durante horas valle cuando la predicción solar del día de hoy es insuficiente.",
         "data": {
           "configure_predictive_charging": "Configurar carga predictiva"
         }
@@ -226,10 +226,14 @@
         "description": "Configura el margen de seguridad y el sensor de predicción solar para el retraso de carga.",
         "data": {
           "delay_safety_margin_h": "Margen de seguridad (horas)",
+          "delay_soc_setpoint_enabled": "Activar SOC mínimo antes del retraso",
+          "delay_soc_setpoint": "SOC mínimo (%)",
           "solar_forecast_sensor": "Sensor de predicción solar"
         },
         "data_description": {
           "delay_safety_margin_h": "Horas antes de la puesta de sol en las que se garantiza que la carga habrá terminado. Valores más altos desbloquean la carga antes.",
+          "delay_soc_setpoint_enabled": "Si se activa, la batería cargará libremente hasta el SOC indicado; por encima de ese valor se activa el retraso solar.",
+          "delay_soc_setpoint": "SOC mínimo que debe alcanzar la batería antes de que el retraso solar entre en funcionamiento. El valor mínimo es el 12 % (SOC mínimo de descarga de las baterías Venus).",
           "solar_forecast_sensor": "Sensor que proporciona la predicción de producción solar en kWh (ej: Solcast). No es necesario si ya configuraste este sensor en el paso inicial: se usará automáticamente."
         }
       },
@@ -390,7 +394,7 @@
       },
       "predictive_charging": {
         "title": "Carga predictiva desde red",
-        "description": "¿Deseas activar la carga inteligente desde red? Esta función permite cargar las baterías automáticamente durante horas valle cuando la predicción solar del día siguiente es insuficiente.",
+        "description": "¿Deseas activar la carga inteligente desde red? Esta función permite cargar las baterías automáticamente durante horas valle cuando la predicción solar del día de hoy es insuficiente.",
         "data": {
           "configure_predictive_charging": "Configurar carga predictiva"
         }
@@ -492,10 +496,14 @@
         "description": "Configura el margen de seguridad y el sensor de predicción solar para el retraso de carga.",
         "data": {
           "delay_safety_margin_h": "Margen de seguridad (horas)",
+          "delay_soc_setpoint_enabled": "Activar SOC mínimo antes del retraso",
+          "delay_soc_setpoint": "SOC mínimo (%)",
           "solar_forecast_sensor": "Sensor de predicción solar"
         },
         "data_description": {
           "delay_safety_margin_h": "Horas antes de la puesta de sol en las que se garantiza que la carga habrá terminado. Valores más altos desbloquean la carga antes.",
+          "delay_soc_setpoint_enabled": "Si se activa, la batería cargará libremente hasta el SOC indicado; por encima de ese valor se activa el retraso solar.",
+          "delay_soc_setpoint": "SOC mínimo que debe alcanzar la batería antes de que el retraso solar entre en funcionamiento. El valor mínimo es el 12 % (SOC mínimo de descarga de las baterías Venus).",
           "solar_forecast_sensor": "Sensor que proporciona la predicción de producción solar en kWh (ej: Solcast). No es necesario si ya configuraste este sensor en el paso inicial: se usará automáticamente."
         }
       },
@@ -626,7 +634,8 @@
           "disabled": "Desactivado",
           "waiting_for_solar": "Esperando solar",
           "delayed": "Retrasado",
-          "charging_allowed": "Carga permitida"
+          "charging_allowed": "Carga permitida",
+          "charging_to_setpoint": "Cargando hasta setpoint"
         }
       },
       "battery_soc": { "name": "SOC de la Batería" },
@@ -711,6 +720,7 @@
       "max_contracted_power": { "name": "Potencia Máxima Contratada" },
       "capacity_protection_soc_threshold": { "name": "Umbral SOC Protección de Capacidad" },
       "delay_safety_margin_min": { "name": "Margen Retraso de Carga" },
+      "delay_soc_setpoint": { "name": "SOC Setpoint Retraso de Carga" },
       "capacity_protection_limit": { "name": "Límite Pico Protección" },
       "backup_offgrid_threshold": { "name": "Umbral Offgrid Backup" }
     },
