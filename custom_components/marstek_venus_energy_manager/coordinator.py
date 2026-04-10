@@ -67,6 +67,7 @@ class MarstekVenusDataUpdateCoordinator(DataUpdateCoordinator):
         self.charge_hysteresis_percent = charge_hysteresis_percent
         self.backup_offgrid_threshold = backup_offgrid_threshold
         self._hysteresis_active = False  # Tracks if battery reached max_soc (for hysteresis)
+        self._hysteresis_base_soc = None  # SOC that triggered hysteresis (used as threshold base)
         self._scan_counter = 0
         self.lock = asyncio.Lock()
         self._is_shutting_down = False  # Flag to suppress errors during shutdown
