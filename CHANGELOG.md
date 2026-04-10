@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.6.1] - 2026-04-10
+
+### Changed
+- **Max price threshold allows up to 5 decimal places**: The input field for the max price threshold in predictive grid charging (both dynamic pricing and real-time price modes) now accepts up to 5 decimal places instead of 3, accommodating price integrations that report values with higher precision.
+
 ## [1.6.0] - 2026-04-07
 
 > [!IMPORTANT]
