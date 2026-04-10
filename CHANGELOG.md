@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.6.1] - 2026-04-10
+
+### Fixed
+- **Charge hysteresis threshold incorrect after weekly full charge**: After a weekly full charge day completed (battery reaching 100 %), the hysteresis logic switched back to the configured max SOC (e.g. 80 %) as its reference instead of the 100 % target actually reached. This caused the re-charge threshold to be set at 70 % (80 % − 10 % hysteresis) rather than the expected 90 % (100 % − 10 %), blocking the battery from recharging even when well below the intended threshold. Fixed by tracking the SOC level that activated the hysteresis (`_hysteresis_base_soc`) and using it — rather than `max_soc` — as the base for the threshold calculation. The tracked value is cleared when the hysteresis deactivates, so normal charging days are unaffected.
+
 ## [1.6.0] - 2026-04-07
 
 > [!IMPORTANT]

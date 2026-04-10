@@ -517,18 +517,25 @@ class ChargeDischargeController:
                         if coordinator._hysteresis_active:
                             _LOGGER.debug("%s: Overriding hysteresis for weekly full charge", coordinator.name)
                         coordinator._hysteresis_active = False
+                        coordinator._hysteresis_base_soc = None
                     else:
                         # Normal hysteresis logic
                         if current_soc >= coordinator.max_soc:
                             coordinator._hysteresis_active = True
+                            # Capture the actual SOC that triggered hysteresis (may be 100% after full charge)
+                            if coordinator._hysteresis_base_soc is None:
+                                coordinator._hysteresis_base_soc = current_soc
 
-                        charge_threshold = coordinator.max_soc - coordinator.charge_hysteresis_percent
+                        # Use actual peak SOC as threshold base (handles post-full-charge case)
+                        hysteresis_base = coordinator._hysteresis_base_soc if coordinator._hysteresis_base_soc else coordinator.max_soc
+                        charge_threshold = hysteresis_base - coordinator.charge_hysteresis_percent
                         if current_soc < charge_threshold:
                             coordinator._hysteresis_active = False
+                            coordinator._hysteresis_base_soc = None
 
                         if coordinator._hysteresis_active:
-                            _LOGGER.debug("%s: Skipping charge - Hysteresis active (SOC %.1f%%, threshold: %.1f%%)",
-                                         coordinator.name, current_soc, charge_threshold)
+                            _LOGGER.debug("%s: Skipping charge - Hysteresis active (SOC %.1f%%, threshold: %.1f%%, base: %.1f%%)",
+                                         coordinator.name, current_soc, charge_threshold, hysteresis_base)
                             continue
 
                 # Determine effective max SOC
