@@ -7,11 +7,13 @@
         "data": {
           "consumption_sensor": "Sensor de consumo de la red",
           "solar_forecast_sensor": "Sensor de predicción solar (opcional)",
+          "household_consumption_sensor": "Sensor de consumo del hogar (opcional)",
           "meter_inverted": "Signo del medidor invertido"
         },
         "data_description": {
           "consumption_sensor": "Sensor que indica la potencia importada (+) o exportada (-) a la red. El controlador ajustará las baterías para mantener este valor cerca de 0W.",
           "solar_forecast_sensor": "Sensor que proporciona la predicción de producción solar en kWh (ej: Solcast). Si se configura aquí, se usará automáticamente en carga predictiva y retraso de carga solar.",
+          "household_consumption_sensor": "Sensor de potencia (W) que mide el consumo total del hogar. Cuando está configurado, la carga predictiva y la carga retrasada usarán datos de consumo real en lugar de estimar desde la descarga de batería.",
           "meter_inverted": "Activa esta opción si tu medidor usa el convenio opuesto: positivo = exportación, negativo = importación. La unidad (W/kW) se detecta automáticamente."
         }
       },
@@ -277,11 +279,13 @@
         "data": {
           "consumption_sensor": "Sensor de consumo de la red",
           "solar_forecast_sensor": "Sensor de predicción solar (opcional)",
+          "household_consumption_sensor": "Sensor de consumo del hogar (opcional)",
           "meter_inverted": "Signo del medidor invertido"
         },
         "data_description": {
           "consumption_sensor": "Sensor que indica la potencia importada (+) o exportada (-) a la red.",
           "solar_forecast_sensor": "Sensor que proporciona la predicción de producción solar en kWh (ej: Solcast). Si se configura aquí, se usará automáticamente en carga predictiva y retraso de carga solar.",
+          "household_consumption_sensor": "Sensor de potencia (W) que mide el consumo total del hogar. Cuando está configurado, la carga predictiva y la carga retrasada usarán datos de consumo real en lugar de estimar desde la descarga de batería.",
           "meter_inverted": "Activa esta opción si tu medidor usa el convenio opuesto: positivo = exportación, negativo = importación. La unidad (W/kW) se detecta automáticamente."
         }
       },
@@ -668,6 +672,7 @@
       "system_daily_charging_energy": { "name": "Energía de Carga Diaria del Sistema" },
       "system_daily_discharging_energy": { "name": "Energía de Descarga Diaria del Sistema" },
       "system_daily_grid_at_min_soc_energy": { "name": "Red al Mín. SOC" },
+      "system_household_energy_today": { "name": "Consumo del Hogar Hoy" },
       "system_alarm_status": { "name": "Estado de Alarma del Sistema" },
       "device_name": { "name": "Nombre del Dispositivo" },
       "sn_code": { "name": "Número de Serie" },

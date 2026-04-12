@@ -7,11 +7,13 @@
         "data": {
           "consumption_sensor": "Netzverbrauchssensor",
           "solar_forecast_sensor": "Solarprognose-Sensor (optional)",
+          "household_consumption_sensor": "Haushaltsverbrauchssensor (optional)",
           "meter_inverted": "Zählervorzeichen invertiert"
         },
         "data_description": {
           "consumption_sensor": "Sensor, der importierte (+) oder exportierte (-) Leistung ins Netz anzeigt. Der Controller passt die Batterien an, um diesen Wert nahe 0W zu halten.",
           "solar_forecast_sensor": "Sensor, der die Solarproduktionsprognose in kWh liefert (z.B. Solcast). Wenn hier konfiguriert, wird er automatisch für prädiktive Ladung und Solarladungsverzögerung verwendet.",
+          "household_consumption_sensor": "Leistungssensor (W) zur Messung des gesamten Haushaltsverbrauchs. Wenn konfiguriert, verwenden prädiktive Ladung und Ladungsverzögerung echte Verbrauchsdaten anstatt sie aus der Batterieentladung zu schätzen.",
           "meter_inverted": "Aktivieren Sie diese Option, wenn Ihr Zähler die umgekehrte Konvention verwendet: positiv = Export, negativ = Import. Die Einheit (W/kW) wird automatisch erkannt."
         }
       },
@@ -277,11 +279,13 @@
         "data": {
           "consumption_sensor": "Netzverbrauchssensor",
           "solar_forecast_sensor": "Solarprognose-Sensor (optional)",
+          "household_consumption_sensor": "Haushaltsverbrauchssensor (optional)",
           "meter_inverted": "Zählervorzeichen invertiert"
         },
         "data_description": {
           "consumption_sensor": "Sensor, der importierte (+) oder exportierte (-) Leistung ins Netz anzeigt.",
           "solar_forecast_sensor": "Sensor, der die Solarproduktionsprognose in kWh liefert (z.B. Solcast). Wenn hier konfiguriert, wird er automatisch für prädiktive Ladung und Solarladungsverzögerung verwendet.",
+          "household_consumption_sensor": "Leistungssensor (W) zur Messung des gesamten Haushaltsverbrauchs. Wenn konfiguriert, verwenden prädiktive Ladung und Ladungsverzögerung echte Verbrauchsdaten anstatt sie aus der Batterieentladung zu schätzen.",
           "meter_inverted": "Aktivieren Sie diese Option, wenn Ihr Zähler die umgekehrte Konvention verwendet: positiv = Export, negativ = Import. Die Einheit (W/kW) wird automatisch erkannt."
         }
       },
@@ -668,6 +672,7 @@
       "system_daily_charging_energy": { "name": "Tägliche System-Ladeenergie" },
       "system_daily_discharging_energy": { "name": "Tägliche System-Entladeenergie" },
       "system_daily_grid_at_min_soc_energy": { "name": "Netz bei Min. SOC" },
+      "system_household_energy_today": { "name": "Haushaltsenergie Heute" },
       "system_alarm_status": { "name": "System-Alarmstatus" },
       "device_name": { "name": "Gerätename" },
       "sn_code": { "name": "Seriennummer" },

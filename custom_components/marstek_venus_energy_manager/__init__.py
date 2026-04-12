@@ -24,6 +24,7 @@ from .const import (
     CONF_ENABLE_PREDICTIVE_CHARGING,
     CONF_CHARGING_TIME_SLOT,
     CONF_SOLAR_FORECAST_SENSOR,
+    CONF_HOUSEHOLD_CONSUMPTION_SENSOR,
     CONF_MAX_CONTRACTED_POWER,
     DEFAULT_BASE_CONSUMPTION_KWH,
     SOC_REEVALUATION_THRESHOLD,
@@ -184,7 +185,13 @@ class ChargeDischargeController:
         self.predictive_charging_enabled = config_entry.data.get(CONF_ENABLE_PREDICTIVE_CHARGING, False)
         self.charging_time_slot = config_entry.data.get(CONF_CHARGING_TIME_SLOT, None)
         self.solar_forecast_sensor = config_entry.data.get(CONF_SOLAR_FORECAST_SENSOR, None)
+        self.household_consumption_sensor = config_entry.data.get(CONF_HOUSEHOLD_CONSUMPTION_SENSOR, None)
         self.max_contracted_power = config_entry.data.get(CONF_MAX_CONTRACTED_POWER, 7000)
+
+        # Household consumption accumulator (integration of power sensor over solar+battery window)
+        self._household_energy_accumulator = 0.0
+        self._household_last_accumulation_time = None
+        self._household_accumulator_date = None  # date when accumulator was last reset
         
         # State tracking for predictive charging
         self.grid_charging_active = False  # True when mode is active
@@ -341,6 +348,7 @@ class ChargeDischargeController:
             self.config_entry.data.get(CONF_ENABLE_WEEKLY_FULL_CHARGE_DELAY, False)
         )
         self.solar_forecast_sensor = self.config_entry.data.get(CONF_SOLAR_FORECAST_SENSOR, None)
+        self.household_consumption_sensor = self.config_entry.data.get(CONF_HOUSEHOLD_CONSUMPTION_SENSOR, None)
         self.predictive_charging_mode = self.config_entry.data.get(CONF_PREDICTIVE_CHARGING_MODE, PREDICTIVE_MODE_TIME_SLOT)
         self.price_sensor = self.config_entry.data.get(CONF_PRICE_SENSOR, None)
         self.price_integration_type = self.config_entry.data.get(CONF_PRICE_INTEGRATION_TYPE, PRICE_INTEGRATION_NORDPOOL)
@@ -1528,8 +1536,21 @@ class ChargeDischargeController:
             for days_ago in range(1, 8):  # Look back 7 days (excluding today)
                 past_date = today - timedelta(days=days_ago)
                 if past_date not in real_data_dates:
-                    # Try to capture this missing day from history
-                    await self._capture_from_history(entity_id, past_date)
+                    if self.household_consumption_sensor:
+                        value = await self._backfill_household_from_history(past_date)
+                        if value is not None and value >= 1.5:
+                            replaced = False
+                            for i, (d, c) in enumerate(self._daily_consumption_history):
+                                if d == past_date:
+                                    self._daily_consumption_history[i] = (past_date, value)
+                                    replaced = True
+                                    break
+                            if not replaced:
+                                self._daily_consumption_history.append((past_date, value))
+                            self._daily_consumption_history.sort(key=lambda x: x[0])
+                            self._daily_consumption_history = self._daily_consumption_history[-7:]
+                    else:
+                        await self._capture_from_history(entity_id, past_date)
                     await asyncio.sleep(0.1)  # Small delay between history queries
 
         # Calculate average from history
@@ -1551,10 +1572,12 @@ class ChargeDischargeController:
             return DEFAULT_BASE_CONSUMPTION_KWH
 
         real_count = sum(1 for _, c in self._daily_consumption_history if c != DEFAULT_BASE_CONSUMPTION_KWH)
+        source = "household sensor" if self.household_consumption_sensor else "battery discharge + grid"
         _LOGGER.info(
-            "Dynamic base consumption: %.1f kWh (avg of %d days, %d real + %d defaults)",
+            "Dynamic base consumption: %.1f kWh (avg of %d days, %d real + %d defaults, source: %s)",
             average, len(self._daily_consumption_history),
-            real_count, len(self._daily_consumption_history) - real_count
+            real_count, len(self._daily_consumption_history) - real_count,
+            source
         )
 
         return average
@@ -1676,6 +1699,106 @@ class ChargeDischargeController:
         except Exception as e:
             _LOGGER.error("Failed to capture from history for %s on %s: %s", entity_id, target_date, e)
 
+    async def _backfill_household_from_history(self, target_date) -> Optional[float]:
+        """Integrate household power sensor history for target_date → kWh.
+
+        Only counts time intervals that fall OUTSIDE the charging_time_slot
+        (the solar+battery window). Returns None if no usable data was found.
+        """
+        from datetime import date, datetime, time as dt_time, timedelta
+        from homeassistant.util import dt as dt_util
+
+        if not self.household_consumption_sensor:
+            return None
+
+        try:
+            from homeassistant.components.recorder import history, get_instance
+        except ImportError:
+            _LOGGER.warning("Recorder not available for household backfill")
+            return None
+
+        local_tz = dt_util.get_time_zone(self.hass.config.time_zone) or dt_util.UTC
+        start_time = datetime.combine(target_date, datetime.min.time()).replace(tzinfo=local_tz)
+        end_time = datetime.combine(target_date, datetime.max.time()).replace(tzinfo=local_tz)
+
+        # Parse charging_time_slot boundaries (if configured)
+        slot_start: Optional[dt_time] = None
+        slot_end: Optional[dt_time] = None
+        if self.charging_time_slot:
+            try:
+                slot_start = dt_time.fromisoformat(self.charging_time_slot["start_time"])
+                slot_end = dt_time.fromisoformat(self.charging_time_slot["end_time"])
+            except Exception:
+                pass
+
+        def _in_consumption_window(ts: datetime) -> bool:
+            """True when ts is outside the charging_time_slot."""
+            if slot_start is None or slot_end is None:
+                return True
+            t = ts.time().replace(tzinfo=None)
+            if slot_start <= slot_end:
+                in_slot = slot_start <= t <= slot_end
+            else:
+                in_slot = t >= slot_start or t <= slot_end
+            return not in_slot
+
+        try:
+            recorder_instance = get_instance(self.hass)
+            states_map = await recorder_instance.async_add_executor_job(
+                history.state_changes_during_period,
+                self.hass,
+                start_time,
+                end_time,
+                self.household_consumption_sensor,
+            )
+        except Exception as e:
+            _LOGGER.error("Household backfill query failed for %s: %s", target_date, e)
+            return None
+
+        entity_states = states_map.get(self.household_consumption_sensor, [])
+        if not entity_states:
+            _LOGGER.debug("No household sensor history for %s", target_date)
+            return None
+
+        # Integrate power × dt over the consumption window
+        energy_kwh = 0.0
+        prev_ts: Optional[datetime] = None
+        prev_kw: Optional[float] = None
+
+        for state in entity_states:
+            if state.state in ('unknown', 'unavailable'):
+                prev_ts = None
+                prev_kw = None
+                continue
+            try:
+                power_w = float(state.state)
+            except (ValueError, TypeError):
+                prev_ts = None
+                prev_kw = None
+                continue
+
+            unit = state.attributes.get("unit_of_measurement", "W")
+            power_kw = power_w / 1000.0 if unit == "W" else power_w
+            ts = state.last_updated
+
+            if prev_ts is not None and prev_kw is not None:
+                # Use the midpoint timestamp to decide if interval is in consumption window
+                mid_ts = prev_ts + (ts - prev_ts) / 2
+                if _in_consumption_window(mid_ts):
+                    dt_hours = (ts - prev_ts).total_seconds() / 3600.0
+                    energy_kwh += max(0.0, prev_kw) * dt_hours
+
+            prev_ts = ts
+            prev_kw = power_kw
+
+        if energy_kwh <= 0:
+            _LOGGER.debug("Household backfill for %s: no energy accumulated", target_date)
+            return None
+
+        result = round(energy_kwh, 2)
+        _LOGGER.debug("Household backfill for %s: %.2f kWh", target_date, result)
+        return result
+
     async def _startup_dynamic_pricing_evaluation(self) -> None:
         """Run dynamic pricing evaluation at startup if the 00:05 window was missed.
 
@@ -1737,24 +1860,24 @@ class ChargeDischargeController:
             sum(1 for _, c in self._daily_consumption_history if c != DEFAULT_BASE_CONSUMPTION_KWH)
         )
 
-        # Also capture today's running total from coordinators if available
-        coordinators_with_data = [c for c in self.coordinators if c.data]
-        if coordinators_with_data:
-            today_value = round(sum(
-                c.data.get("total_daily_discharging_energy", 0)
-                for c in coordinators_with_data
-            ) + self._daily_grid_at_min_soc_kwh, 2)
-            if today_value >= 1.5:
-                # Replace today's default with current running total
-                for i, (d, c) in enumerate(self._daily_consumption_history):
-                    if d == today:
-                        if c == DEFAULT_BASE_CONSUMPTION_KWH:
-                            self._daily_consumption_history[i] = (today, today_value)
-                            _LOGGER.info(
-                                "Startup backfill: replaced today's default with current value: %.2f kWh",
-                                today_value
-                            )
-                        break
+        if not self.household_consumption_sensor:
+            # Battery discharge method: also capture today's running total from coordinators
+            coordinators_with_data = [c for c in self.coordinators if c.data]
+            if coordinators_with_data:
+                today_value = round(sum(
+                    c.data.get("total_daily_discharging_energy", 0)
+                    for c in coordinators_with_data
+                ) + self._daily_grid_at_min_soc_kwh, 2)
+                if today_value >= 1.5:
+                    for i, (d, c) in enumerate(self._daily_consumption_history):
+                        if d == today:
+                            if c == DEFAULT_BASE_CONSUMPTION_KWH:
+                                self._daily_consumption_history[i] = (today, today_value)
+                                _LOGGER.info(
+                                    "Startup backfill: replaced today's default with current value: %.2f kWh",
+                                    today_value
+                                )
+                            break
 
         # Try to backfill past days from recorder history
         real_data_dates = {d for d, c in self._daily_consumption_history if c != DEFAULT_BASE_CONSUMPTION_KWH}
@@ -1762,7 +1885,21 @@ class ChargeDischargeController:
         for days_ago in range(1, 8):
             past_date = today - timedelta(days=days_ago)
             if past_date not in real_data_dates:
-                await self._capture_from_history(entity_id, past_date)
+                if self.household_consumption_sensor:
+                    value = await self._backfill_household_from_history(past_date)
+                    if value is not None and value >= 1.5:
+                        replaced = False
+                        for i, (d, c) in enumerate(self._daily_consumption_history):
+                            if d == past_date:
+                                self._daily_consumption_history[i] = (past_date, value)
+                                replaced = True
+                                break
+                        if not replaced:
+                            self._daily_consumption_history.append((past_date, value))
+                        self._daily_consumption_history.sort(key=lambda x: x[0])
+                        self._daily_consumption_history = self._daily_consumption_history[-7:]
+                else:
+                    await self._capture_from_history(entity_id, past_date)
                 await asyncio.sleep(0.1)
                 backfill_count += 1
 
@@ -1847,17 +1984,30 @@ class ChargeDischargeController:
 
         today = date.today()
 
-        # Read directly from coordinator data (sum across all batteries)
-        coordinators_with_data = [c for c in self.coordinators if c.data]
-        if not coordinators_with_data:
-            _LOGGER.warning("Daily consumption capture: no coordinators with data available")
-            return
+        # --- BIFURCATION: household sensor vs battery discharge estimation ---
+        if self.household_consumption_sensor:
+            current_value = round(self._household_energy_accumulator, 2)
+            if current_value < 1.5:
+                _LOGGER.warning(
+                    "Daily consumption capture: household accumulator too low (%.2f kWh), skipping",
+                    current_value
+                )
+                return
+        else:
+            # Read directly from coordinator data (sum across all batteries)
+            coordinators_with_data = [c for c in self.coordinators if c.data]
+            if not coordinators_with_data:
+                _LOGGER.warning("Daily consumption capture: no coordinators with data available")
+                return
+
+            current_value = None  # assigned in try block below
 
         try:
-            current_value = round(sum(
-                c.data.get("total_daily_discharging_energy", 0)
-                for c in coordinators_with_data
-            ) + self._daily_grid_at_min_soc_kwh, 2)
+            if not self.household_consumption_sensor:
+                current_value = round(sum(
+                    c.data.get("total_daily_discharging_energy", 0)
+                    for c in coordinators_with_data
+                ) + self._daily_grid_at_min_soc_kwh, 2)
 
             # Only capture if we have meaningful data (>= 1.5 kWh)
             if current_value < 1.5:
@@ -2131,6 +2281,7 @@ class ChargeDischargeController:
             "total_available_kwh": total_available_kwh,
             "energy_deficit_kwh": energy_deficit_kwh,
             "days_in_history": days_in_history,
+            "consumption_source": "household_sensor" if self.household_consumption_sensor else "battery_discharge",
             "reason": (
                 f"Energy deficit: {energy_deficit_kwh:.2f} kWh "
                 f"(available: {total_available_kwh:.2f} kWh < consumption: {avg_consumption_kwh:.2f} kWh)"
@@ -2168,15 +2319,74 @@ class ChargeDischargeController:
     
 
 
+    def _is_in_consumption_window(self) -> bool:
+        """Return True when we are OUTSIDE the charging_time_slot (solar+battery window).
+
+        If no charging_time_slot is configured, the consumption window is 24 h.
+        On days NOT covered by the slot, the battery is not in use → return False.
+        On days covered by the slot, return True only during the hours outside the slot.
+        """
+        if not self.charging_time_slot:
+            return True
+
+        from datetime import datetime
+        now = datetime.now()
+        current_day = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"][now.weekday()]
+
+        # Battery only operates on days covered by the charging slot
+        if current_day not in self.charging_time_slot["days"]:
+            return False
+
+        return not self._check_time_window()
+
+    async def _accumulate_household_consumption(self) -> None:
+        """Integrate household power sensor → kWh accumulator (called every control cycle).
+
+        Only accumulates during the solar+battery window (outside charging_time_slot).
+        Uses monotonic time to avoid issues with system clock changes.
+        """
+        from time import monotonic
+
+        if not self.household_consumption_sensor:
+            return
+
+        if not self._is_in_consumption_window():
+            # Outside measurement window — pause accumulation but don't reset timer
+            self._household_last_accumulation_time = None
+            return
+
+        state = self.hass.states.get(self.household_consumption_sensor)
+        if state is None or state.state in ('unknown', 'unavailable'):
+            if state is None:
+                _LOGGER.warning(
+                    "Household consumption sensor %s not found",
+                    self.household_consumption_sensor
+                )
+            return
+
+        try:
+            power_w = float(state.state)
+        except (ValueError, TypeError):
+            return
+
+        unit = state.attributes.get("unit_of_measurement", "W")
+        power_kw = power_w / 1000.0 if unit == "W" else power_w
+
+        now = monotonic()
+        if self._household_last_accumulation_time is not None:
+            dt_hours = (now - self._household_last_accumulation_time) / 3600.0
+            self._household_energy_accumulator += max(0.0, power_kw) * dt_hours
+        self._household_last_accumulation_time = now
+
     def _is_in_predictive_charging_slot(self) -> bool:
         """Check if we're currently within the predictive charging time slot."""
         if not self.predictive_charging_enabled or self.charging_time_slot is None:
             return False
-        
+
         # Check manual override
         if self.predictive_charging_overridden:
             return False
-        
+
         return self._check_time_window()
 
     async def _handle_predictive_grid_charging(self):
@@ -3773,6 +3983,23 @@ class ChargeDischargeController:
         if any(c._is_shutting_down for c in self.coordinators):
             return
 
+        # === HOUSEHOLD CONSUMPTION ACCUMULATION ===
+        # Run before manual mode check so samples are never lost
+        if self.household_consumption_sensor:
+            from datetime import date as _date
+            _today = _date.today()
+            if self._household_accumulator_date != _today:
+                if self._household_accumulator_date is not None:
+                    _LOGGER.info(
+                        "Household accumulator daily reset (was %.2f kWh for %s)",
+                        self._household_energy_accumulator,
+                        self._household_accumulator_date,
+                    )
+                self._household_energy_accumulator = 0.0
+                self._household_last_accumulation_time = None
+                self._household_accumulator_date = _today
+        await self._accumulate_household_consumption()
+
         # === MANUAL MODE CHECK (highest priority) ===
         # If manual mode is enabled, skip all automatic control logic
         if self.manual_mode_enabled:
@@ -4592,6 +4819,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not controller._daily_consumption_history:
         controller._initialize_consumption_history_with_defaults()
         await controller._save_consumption_history()
+
+    # Restore household consumption accumulator from binary sensor attributes (if date matches today)
+    if controller.household_consumption_sensor:
+        _bs_entity_id = "binary_sensor.predictive_charging_active"
+        _bs_state = hass.states.get(_bs_entity_id)
+        if _bs_state and _bs_state.attributes:
+            from datetime import date as _date
+            _today = _date.today()
+            _acc_date_str = _bs_state.attributes.get("household_accumulator_date")
+            if _acc_date_str:
+                try:
+                    _acc_date = _date.fromisoformat(_acc_date_str)
+                    if _acc_date == _today:
+                        _acc_value = float(_bs_state.attributes.get("household_energy_today_kwh", 0.0))
+                        controller._household_energy_accumulator = _acc_value
+                        controller._household_accumulator_date = _today
+                        _LOGGER.info(
+                            "Restored household energy accumulator: %.2f kWh for %s",
+                            _acc_value, _today
+                        )
+                except Exception as _e:
+                    _LOGGER.warning("Failed to restore household accumulator: %s", _e)
 
     # Restore weekly charge completion state from previous session
     await controller._load_weekly_charge_state()

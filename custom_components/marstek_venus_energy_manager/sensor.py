@@ -51,7 +51,7 @@ from .const import (
     CONF_METER_INVERTED,
 )
 from .coordinator import MarstekVenusDataUpdateCoordinator
-from .aggregate_sensors import AGGREGATE_SENSOR_DEFINITIONS, MarstekVenusAggregateSensor, DailyGridAtMinSocSensor, SystemAlarmSensor
+from .aggregate_sensors import AGGREGATE_SENSOR_DEFINITIONS, MarstekVenusAggregateSensor, DailyGridAtMinSocSensor, HouseholdConsumptionSensor, SystemAlarmSensor
 from .calculated_sensors import MarstekVenusEfficiencySensor, MarstekVenusStoredEnergySensor, MarstekVenusCycleSensor
 
 _LOGGER = logging.getLogger(__name__)
@@ -134,6 +134,10 @@ async def async_setup_entry(
     # Add daily grid-at-min-soc energy sensor (feeds into consumption estimation)
     if controller:
         entities.append(DailyGridAtMinSocSensor(controller))
+
+    # Add household consumption sensor (only when household sensor is configured)
+    if controller and controller.household_consumption_sensor:
+        entities.append(HouseholdConsumptionSensor(controller))
 
     # Add configuration summary diagnostic sensor (hidden, for support purposes)
     entities.append(ConfigurationSummarySensor(hass, entry))

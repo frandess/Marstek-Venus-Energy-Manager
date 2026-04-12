@@ -7,11 +7,13 @@
         "data": {
           "consumption_sensor": "Grid consumption sensor",
           "solar_forecast_sensor": "Solar forecast sensor (optional)",
+          "household_consumption_sensor": "Household consumption sensor (optional)",
           "meter_inverted": "Inverted meter sign"
         },
         "data_description": {
           "consumption_sensor": "Sensor that indicates imported (+) or exported (-) power to the grid. The controller will adjust batteries to keep this value near 0W.",
           "solar_forecast_sensor": "Sensor providing solar production forecast in kWh (e.g., Solcast). If configured here, it will be used automatically for predictive charging and solar charge delay.",
+          "household_consumption_sensor": "Power sensor (W) measuring total household consumption. When configured, predictive charging and charge delay will use real consumption data instead of estimating from battery discharge.",
           "meter_inverted": "Enable this option if your meter uses the opposite convention: positive = export, negative = import. The unit (W/kW) is detected automatically."
         }
       },
@@ -275,11 +277,13 @@
         "data": {
           "consumption_sensor": "Grid consumption sensor",
           "solar_forecast_sensor": "Solar forecast sensor (optional)",
+          "household_consumption_sensor": "Household consumption sensor (optional)",
           "meter_inverted": "Inverted meter sign"
         },
         "data_description": {
           "consumption_sensor": "Sensor that indicates imported (+) or exported (-) power to the grid.",
           "solar_forecast_sensor": "Sensor providing solar production forecast in kWh (e.g., Solcast). If configured here, it will be used automatically for predictive charging and solar charge delay.",
+          "household_consumption_sensor": "Power sensor (W) measuring total household consumption. When configured, predictive charging and charge delay will use real consumption data instead of estimating from battery discharge.",
           "meter_inverted": "Enable this option if your meter uses the opposite convention: positive = export, negative = import. The unit (W/kW) is detected automatically."
         }
       },
@@ -663,6 +667,7 @@
       "system_daily_charging_energy": { "name": "System Daily Charging Energy" },
       "system_daily_discharging_energy": { "name": "System Daily Discharging Energy" },
       "system_daily_grid_at_min_soc_energy": { "name": "Grid at Min SOC" },
+      "system_household_energy_today": { "name": "Household Energy Today" },
       "system_alarm_status": { "name": "System Alarm Status" },
       "device_name": { "name": "Device Name" },
       "sn_code": { "name": "Serial Number" },
