@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.6.3] - 2026-04-12
+
+### Fixed
+- **Peak shaving ignored excluded devices with "included in consumption"**: When a special device was configured with "consumption is included in the household consumption sensor", its power was subtracted from the grid reading before peak shaving evaluated the house load. This meant peak shaving never saw the device's consumption and would not discharge the battery to shave peaks caused by it. Peak shaving now calculates the estimated house load using the real grid reading (including excluded devices) and overrides the device exclusion when actively shaving or conserving, so the battery discharges to keep total grid import below the configured limit regardless of device exclusion settings.
+
 ## [1.6.2] - 2026-04-10
 
 ### Fixed

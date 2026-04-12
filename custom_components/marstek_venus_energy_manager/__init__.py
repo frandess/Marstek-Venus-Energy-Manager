@@ -234,6 +234,7 @@ class ChargeDischargeController:
         self.capacity_protection_soc_threshold = config_entry.data.get(CONF_CAPACITY_PROTECTION_SOC_THRESHOLD, DEFAULT_CAPACITY_PROTECTION_SOC)
         self.capacity_protection_limit = config_entry.data.get(CONF_CAPACITY_PROTECTION_LIMIT, DEFAULT_CAPACITY_PROTECTION_LIMIT)
         self._capacity_protection_active = False  # True when SOC < threshold (protection is intervening)
+        self._excluded_included_adjustment = 0.0  # Tracks excluded device adjustment for included_in_consumption devices
         self._capacity_protection_status = {
             "active": False,
             "avg_soc": None,
@@ -2556,11 +2557,13 @@ class ChargeDischargeController:
         """
         excluded_devices = self.config_entry.data.get("excluded_devices", [])
         if not excluded_devices:
+            self._excluded_included_adjustment = 0.0
             return 0.0
 
         is_charging = self.previous_power >= 0
 
         total_adjustment = 0.0
+        included_adjustment = 0.0  # Track included_in_consumption portion separately
         for device in excluded_devices:
             # EV chargers in no-telemetry mode expose a state sensor, not a numeric
             # power sensor – their behaviour is handled by _check_ev_charger_state().
@@ -2593,11 +2596,13 @@ class ChargeDischargeController:
                             # Battery is discharging: full exclusion so battery won't
                             # discharge to power this device.
                             total_adjustment += device_power
+                            included_adjustment += device_power
                             current_grid_power -= device_power
                             _LOGGER.debug("Excluded device %s consuming %.1fW (solar surplus, battery discharging → full exclusion)",
                                         power_sensor, device_power)
                     else:
                         total_adjustment += device_power
+                        included_adjustment += device_power
                         _LOGGER.debug("Excluded device %s consuming %.1fW (included in consumption, SUBTRACTING)",
                                     power_sensor, device_power)
                 else:
@@ -2607,7 +2612,9 @@ class ChargeDischargeController:
                                     power_sensor, device_power)
             except (ValueError, TypeError):
                 _LOGGER.warning("Could not parse device sensor %s: %s", power_sensor, state.state)
-        
+
+        # Store the included-in-consumption portion for capacity protection
+        self._excluded_included_adjustment = included_adjustment
         return total_adjustment
 
     def _check_ev_charger_state(self) -> tuple[bool, bool]:
@@ -4014,10 +4021,18 @@ class ChargeDischargeController:
             if avg_soc < self.capacity_protection_soc_threshold:
                 # Estimate house consumption: grid reading minus what the battery is currently doing
                 # sensor_actual = grid power (positive=import), previous_power > 0 = charging, < 0 = discharging
-                estimated_house_load = sensor_actual - self.previous_power
+                # Add back excluded-device adjustment so capacity protection sees the REAL grid load
+                # including devices marked as "included in consumption". This ensures capacity
+                # protection can shave peaks even when those devices are normally excluded.
+                estimated_house_load = (sensor_actual + self._excluded_included_adjustment) - self.previous_power
 
                 if estimated_house_load > self.capacity_protection_limit:
                     # House load exceeds peak limit: discharge only the excess
+                    # Undo excluded-device adjustment so PD controller can discharge against real grid
+                    if self._excluded_included_adjustment > 0:
+                        _LOGGER.info("Capacity Protection overriding excluded device adjustment (%.0fW) for peak shaving",
+                                    self._excluded_included_adjustment)
+                        sensor_actual += self._excluded_included_adjustment
                     active_target = self.capacity_protection_limit
                     _LOGGER.info("Capacity Protection ACTIVE: SOC=%.1f%% < %d%%, house_load=%.0fW > limit=%dW → target=%dW",
                                 avg_soc, self.capacity_protection_soc_threshold,
@@ -4032,6 +4047,11 @@ class ChargeDischargeController:
                 elif estimated_house_load > active_target:
                     # House load is below peak limit but above normal target: set target to house load
                     # This makes the PD controller smoothly ramp discharge to 0W
+                    # Undo excluded-device adjustment so target aligns with real grid reading
+                    if self._excluded_included_adjustment > 0:
+                        _LOGGER.info("Capacity Protection overriding excluded device adjustment (%.0fW) for conservation",
+                                    self._excluded_included_adjustment)
+                        sensor_actual += self._excluded_included_adjustment
                     active_target = estimated_house_load
                     _LOGGER.info("Capacity Protection ACTIVE: SOC=%.1f%% < %d%%, house_load=%.0fW ≤ limit=%dW → idle (target=%.0fW)",
                                 avg_soc, self.capacity_protection_soc_threshold,
