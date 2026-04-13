@@ -1717,6 +1717,10 @@ LOW_FORECAST_THRESHOLD_FACTOR = 1.5  # forecast < 1.5 × capacity → bad solar 
 T_START_THRESHOLD_KWH = 0.1  # Threshold to detect solar production start
 T_START_FALLBACK_HOUR = 11  # If no T_start by 11:00, unlock immediately
 
+EVENING_REEVAL_HOURS_BEFORE_TEND = 1.5  # Trigger evening re-evaluation 1.5h before estimated T_end
+EVENING_REEVAL_FALLBACK_HOUR = 16.0     # Fallback trigger hour when T_start was never detected
+EVENING_DEFICIT_THRESHOLD_KWH = 0.3    # Minimum deficit to bother scheduling evening charging
+
 # Weekday mapping (mon=0, sun=6, matches datetime.weekday())
 WEEKDAY_MAP = {
     "mon": 0, "tue": 1, "wed": 2, "thu": 3,
