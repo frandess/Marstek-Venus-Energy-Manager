@@ -1,9 +1,6 @@
 # Changelog
 
-## [Unreleased]
-
-### Fixed
-- **Dynamic pricing notification showed wrong "needed" value**: When no grid charging was required, the "Available ≥ X kWh needed" line always displayed the same value on both sides due to a broken formula (`abs(deficit) + consumption` algebraically equals `total_available` when no deficit exists). Fixed to show the actual average consumption. A second notification path (no price slots found) also omitted the numeric consumption value entirely ("≥ needed"); fixed to include it.
+## [1.6.4] - 2026-04-14
 
 ### Added
 - **Integration Status sensor**: New sensor (`sensor.marstek_venus_system_integration_status`) showing at a glance what the integration is currently doing. It reflects the highest-priority active mode and updates every poll cycle. Possible states: `Charging from Grid` (predictive grid charging active), `Weekly Full Charge` (charging to 100 %), `Charge Delayed`, `Waiting for Solar`, `Charging to Setpoint`, `Capacity Protection`, `No-Discharge Window` (inside a configured time slot), `Charging`, `Discharging`, `Standby` (within deadband, no action needed), `Manual Mode`, and `Initializing`. Fully translated into EN, ES, DE, FR, and NL.
@@ -18,6 +15,10 @@
   - **New diagnostic attributes** on `binary_sensor.marstek_venus_system_predictive_charging_active`: `consumption_source` (`household_sensor` or `battery_discharge`), `household_consumption_sensor` (entity ID), `household_consumption_battery_window_kwh`, and `household_accumulator_date`.
   - The accumulator survives HA restarts and reloads via persistent storage (previously used binary sensor attributes, which were lost on config entry reload).
   - Backfill on startup queries the recorder for the configured sensor's history to fill in consumption data for past days, using the same time-window filter.
+  - Documentation updated with a step-by-step guide on how to create the household consumption sensor as a Template helper (combining grid, solar, and battery power readings).
+
+### Fixed
+- **Dynamic pricing notification showed wrong "needed" value**: When no grid charging was required, the "Available ≥ X kWh needed" line always displayed the same value on both sides due to a broken formula (`abs(deficit) + consumption` algebraically equals `total_available` when no deficit exists). Fixed to show the actual average consumption. A second notification path (no price slots found) also omitted the numeric consumption value entirely ("≥ needed"); fixed to include it.
 
 ## [1.6.3] - 2026-04-12
 

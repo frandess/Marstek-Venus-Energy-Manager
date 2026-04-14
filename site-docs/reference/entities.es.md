@@ -67,7 +67,28 @@ La integración crea automáticamente entidades para cada batería configurada y
 |---|---|
 | `button.*_reset` | Reset del dispositivo |
 
-## Sensores agregados del sistema
+## Sensores del sistema
+
+### Estado de la integración
+
+`sensor.marstek_venus_system_integration_status` muestra de un vistazo qué está haciendo la integración en cada momento. Refleja el modo activo de mayor prioridad:
+
+| Estado | Descripción |
+|---|---|
+| `Charging from Grid` | Carga predictiva desde la red activa |
+| `Weekly Full Charge` | Cargando al 100 % para equilibrado de celdas |
+| `Charge Delayed` | Carga bloqueada, esperando el momento óptimo según previsión solar |
+| `Waiting for Solar` | Retraso de carga: esperando que comience la producción solar |
+| `Charging to Setpoint` | Retraso de carga: cargando hasta el SOC mínimo configurado |
+| `Capacity Protection` | Descarga limitada por SOC bajo (peak shaving activo) |
+| `No-Discharge Window` | Dentro de una franja horaria sin descarga configurada |
+| `Charging` | Cargando (excedente solar u otro) |
+| `Discharging` | Descargando para cubrir el consumo del hogar |
+| `Standby` | Sistema equilibrado dentro de la banda muerta, sin acción necesaria |
+| `Manual Mode` | Modo manual activo — la integración no envía comandos automáticos |
+| `Initializing` | Primer ciclo del controlador aún no completado |
+
+### Sensores agregados
 
 Disponibles bajo el prefijo `sensor.marstek_venus_system_*`, suman los valores de todas las baterías:
 

@@ -67,7 +67,28 @@ The integration automatically creates entities for each configured battery and a
 |---|---|
 | `button.*_reset` | Device reset |
 
-## System aggregate sensors
+## System sensors
+
+### Integration Status
+
+`sensor.marstek_venus_system_integration_status` shows at a glance what the integration is currently doing. It reflects the highest-priority active mode:
+
+| State | Description |
+|---|---|
+| `Charging from Grid` | Predictive grid charging is active |
+| `Weekly Full Charge` | Charging to 100 % for cell balancing |
+| `Charge Delayed` | Charging blocked, waiting for optimal time based on solar forecast |
+| `Waiting for Solar` | Charge delay: waiting for solar production to start |
+| `Charging to Setpoint` | Charge delay: charging to the configured minimum SOC |
+| `Capacity Protection` | Discharge limited due to low SOC (peak shaving active) |
+| `No-Discharge Window` | Inside a configured no-discharge time slot |
+| `Charging` | Charging (solar surplus or other) |
+| `Discharging` | Discharging to cover home consumption |
+| `Standby` | System balanced within deadband, no action needed |
+| `Manual Mode` | Manual mode active — integration sends no automatic commands |
+| `Initializing` | First controller cycle not yet completed |
+
+### Aggregate sensors
 
 Available under the `sensor.marstek_venus_system_*` prefix, summing values across all batteries:
 
