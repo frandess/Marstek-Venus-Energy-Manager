@@ -71,14 +71,6 @@ The integration automatically creates entities for each configured battery and a
 
 Available under the `sensor.marstek_venus_system_*` prefix, summing values across all batteries:
 
-<<<<<<< Updated upstream
-- `system_battery_power` — Potencia total del sistema
-- `system_battery_soc` — SOC promedio del sistema
-- `system_total_charging_energy` — Energía total cargada (sistema)
-- `system_total_discharging_energy` — Energía total descargada (sistema)
-- `grid_at_min_soc` — Importación de red durante periodos en SOC mínimo (kWh)
-- `system_alarm_status` — Estado de alarma agregado de todas las baterías (`OK` / `Warning` / `Fault`); los atributos listan las condiciones activas por batería
-=======
 - `system_battery_power` — Total system power
 - `system_battery_soc` — System average SOC
 - `system_total_charging_energy` — Total system charging energy
@@ -86,6 +78,5 @@ Available under the `sensor.marstek_venus_system_*` prefix, summing values acros
 - `grid_at_min_soc` — Grid import during min SOC periods (kWh)
 - `system_alarm_status` — Aggregated alarm state across all batteries (`OK` / `Warning` / `Fault`); attributes list active conditions per battery
 - `household_energy_today` — Today's household energy consumption accumulated from the optional household power sensor, during the solar+battery window (kWh). Only present when a household consumption sensor is configured. Resets at midnight.
->>>>>>> Stashed changes
 
 ![Entity list in Home Assistant](../assets/screenshots/reference/entities-list.png){ width="700"  style="display: block; margin: 0 auto;"}

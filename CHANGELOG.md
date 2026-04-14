@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **Dynamic pricing — evening re-evaluation**: A new late-day check activates once per day when solar production is winding down (1.5 h before the estimated T_end, or at 16:00 on days with no detected solar start). If the batteries have not reached their target SOC and the remaining solar is insufficient to cover the gap, the integration searches for cheap price slots between now and midnight and schedules them for grid charging. New slots are merged into the existing morning schedule if one exists, or a new schedule is created. A dedicated persistent notification ("Predictive Charging: Evening re-evaluation") is sent listing the slots added and the estimated deficit. This catches the common scenario where the morning forecast was optimistic (more clouds or more household consumption than expected) and the batteries end up under-charged by end of day.
+
+- **Solar production accumulator**: When the household consumption sensor is configured, the integration now integrates real-time solar production throughout the day (`Solar_W = House_W + Battery_Net_W − Grid_W`). The accumulated value (`solar_production_today_kwh`) is exposed as a diagnostic attribute on `binary_sensor.marstek_venus_system_predictive_charging_active` and is used by the charge delay logic to compute remaining solar more accurately: instead of the sinusoidal fraction-of-day estimate, it subtracts actual production from the forecast (`remaining = forecast − produced_so_far`). The accumulator survives restarts and reloads via the same persistent storage used by the household consumption accumulator.
+
+- **Household consumption sensor**: New optional power sensor (W or kW) that can be configured at the main sensor step. When set, the integration integrates the sensor's power reading over time to compute daily household energy consumption (kWh) during the solar+battery window (i.e. outside the configured charging time slot). This replaces the previous estimation method — which derived consumption from battery discharge + grid import at min SOC — with real measured data. The improvement is most visible in weeks with high solar production, where the old method systematically underestimated demand and could skip necessary grid charging.
+
+  - **Predictive charging** and **charge delay** automatically use the real consumption data when the sensor is configured. No additional setup is needed — the switch between sources is transparent.
+  - **New diagnostic attributes** on `binary_sensor.marstek_venus_system_predictive_charging_active`: `consumption_source` (`household_sensor` or `battery_discharge`), `household_consumption_sensor` (entity ID), `household_consumption_battery_window_kwh`, and `household_accumulator_date`.
+  - The accumulator survives HA restarts and reloads via persistent storage (previously used binary sensor attributes, which were lost on config entry reload).
+  - Backfill on startup queries the recorder for the configured sensor's history to fill in consumption data for past days, using the same time-window filter.
+
 ## [1.6.3] - 2026-04-12
 
 ### Fixed

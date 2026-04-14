@@ -24,6 +24,7 @@ from .const import (
     CONF_ENABLE_PREDICTIVE_CHARGING,
     CONF_CHARGING_TIME_SLOT,
     CONF_SOLAR_FORECAST_SENSOR,
+    CONF_HOUSEHOLD_CONSUMPTION_SENSOR,
     CONF_MAX_CONTRACTED_POWER,
     DEFAULT_BASE_CONSUMPTION_KWH,
     SOC_REEVALUATION_THRESHOLD,
@@ -41,6 +42,9 @@ from .const import (
     CHARGE_EFFICIENCY,
     DELAY_SAFETY_FACTOR,
     T_START_FALLBACK_HOUR,
+    EVENING_REEVAL_HOURS_BEFORE_TEND,
+    EVENING_REEVAL_FALLBACK_HOUR,
+    EVENING_DEFICIT_THRESHOLD_KWH,
     CONF_PD_KP,
     CONF_PD_KD,
     CONF_PD_DEADBAND,
@@ -184,7 +188,18 @@ class ChargeDischargeController:
         self.predictive_charging_enabled = config_entry.data.get(CONF_ENABLE_PREDICTIVE_CHARGING, False)
         self.charging_time_slot = config_entry.data.get(CONF_CHARGING_TIME_SLOT, None)
         self.solar_forecast_sensor = config_entry.data.get(CONF_SOLAR_FORECAST_SENSOR, None)
+        self.household_consumption_sensor = config_entry.data.get(CONF_HOUSEHOLD_CONSUMPTION_SENSOR, None)
         self.max_contracted_power = config_entry.data.get(CONF_MAX_CONTRACTED_POWER, 7000)
+
+        # Household consumption accumulator (integration of power sensor over solar+battery window)
+        self._household_energy_accumulator = 0.0
+        self._household_last_accumulation_time = None
+        self._household_accumulator_date = None  # date when accumulator was last reset
+
+        # Solar production accumulator (house + battery_net - grid, integrated over the day)
+        self._solar_production_accumulator = 0.0
+        self._solar_last_accumulation_time = None
+        self._solar_accumulator_date = None  # date when solar accumulator was last reset
         
         # State tracking for predictive charging
         self.grid_charging_active = False  # True when mode is active
@@ -215,6 +230,7 @@ class ChargeDischargeController:
         self._dp_eval_retry_count = 0  # Retry counter if tomorrow prices not available at 23:00
         self._dp_pre_evaluated_slots: dict = {}  # slot.start (datetime) → should_charge (bool)
         self._price_data_status = "not_evaluated"
+        self._dp_evening_reevaluated_date = None  # Prevent multiple evening re-evaluations per day
 
         # Consumption history for dynamic base consumption (7-day rolling average)
         self._daily_consumption_history = []  # List of (date, consumption_kwh)
@@ -297,6 +313,9 @@ class ChargeDischargeController:
         self._store = Store(hass, 1, f"{DOMAIN}.{config_entry.entry_id}.weekly_charge_state")
         # Persistent storage for solar T_start (survives HA restarts within the same day)
         self._solar_t_start_store = Store(hass, 1, f"{DOMAIN}.{config_entry.entry_id}.solar_t_start")
+        # Persistent storage for household and solar accumulators
+        self._accumulator_store = Store(hass, 1, f"{DOMAIN}.{config_entry.entry_id}.accumulators")
+        self._accumulator_last_save_monotonic: float = 0.0  # throttle saves to once per 5 min
 
         _LOGGER.info("PD Controller initialized (user-configurable): Kp=%.2f, Ki=%.2f, Kd=%.2f, "
                      "Deadband=±%dW, Filter=%d samples, Hysteresis=%dW, MaxChange=%dW/cycle, Limits: ±%dW",
@@ -341,6 +360,7 @@ class ChargeDischargeController:
             self.config_entry.data.get(CONF_ENABLE_WEEKLY_FULL_CHARGE_DELAY, False)
         )
         self.solar_forecast_sensor = self.config_entry.data.get(CONF_SOLAR_FORECAST_SENSOR, None)
+        self.household_consumption_sensor = self.config_entry.data.get(CONF_HOUSEHOLD_CONSUMPTION_SENSOR, None)
         self.predictive_charging_mode = self.config_entry.data.get(CONF_PREDICTIVE_CHARGING_MODE, PREDICTIVE_MODE_TIME_SLOT)
         self.price_sensor = self.config_entry.data.get(CONF_PRICE_SENSOR, None)
         self.price_integration_type = self.config_entry.data.get(CONF_PRICE_INTEGRATION_TYPE, PRICE_INTEGRATION_NORDPOOL)
@@ -826,6 +846,40 @@ class ChargeDischargeController:
         except Exception as e:
             _LOGGER.error("Charge Delay: Failed to load solar T_start from storage: %s", e)
 
+    def _save_accumulators(self) -> None:
+        """Fire-and-forget: persist household and solar accumulators to storage."""
+        if not self.household_consumption_sensor:
+            return
+        asyncio.create_task(self._accumulator_store.async_save({
+            "date": self._household_accumulator_date.isoformat() if self._household_accumulator_date else None,
+            "household_kwh": round(self._household_energy_accumulator, 4),
+            "solar_kwh": round(self._solar_production_accumulator, 4),
+        }))
+
+    async def _load_accumulators(self) -> None:
+        """Restore household and solar accumulators from storage (today's values only)."""
+        if not self.household_consumption_sensor:
+            return
+        try:
+            data = await self._accumulator_store.async_load()
+            if not data:
+                return
+            from datetime import date
+            stored_date_str = data.get("date")
+            if not stored_date_str or stored_date_str != date.today().isoformat():
+                return
+            today = date.today()
+            self._household_energy_accumulator = float(data.get("household_kwh", 0.0))
+            self._household_accumulator_date = today
+            self._solar_production_accumulator = float(data.get("solar_kwh", 0.0))
+            self._solar_accumulator_date = today
+            _LOGGER.info(
+                "Restored accumulators from storage: household=%.2f kWh, solar=%.2f kWh",
+                self._household_energy_accumulator, self._solar_production_accumulator,
+            )
+        except Exception as e:
+            _LOGGER.warning("Failed to load accumulators from storage: %s", e)
+
     # ---- Weekly Full Charge Delay Methods ----
 
     def _calculate_solar_noon(self) -> float:
@@ -1216,8 +1270,13 @@ class ChargeDischargeController:
         charge_time_h = energy_needed_kwh / (max_charge_power_kw * CHARGE_EFFICIENCY)
 
         # Remaining solar and consumption
-        solar_fraction_done = self._get_solar_fraction_done(now_h, self._solar_t_start, t_end)
-        remaining_solar_kwh = forecast_today * (1.0 - solar_fraction_done)
+        if self.household_consumption_sensor and self._solar_production_accumulator > 0:
+            # Use actual measured solar production to estimate remaining
+            remaining_solar_kwh = max(0.0, forecast_today - self._solar_production_accumulator)
+            status["solar_produced_today_kwh"] = round(self._solar_production_accumulator, 2)
+        else:
+            solar_fraction_done = self._get_solar_fraction_done(now_h, self._solar_t_start, t_end)
+            remaining_solar_kwh = forecast_today * (1.0 - solar_fraction_done)
 
         hours_to_t_end = max(0, t_end - now_h)
         daylight_hours = t_end - self._solar_t_start
@@ -1528,8 +1587,21 @@ class ChargeDischargeController:
             for days_ago in range(1, 8):  # Look back 7 days (excluding today)
                 past_date = today - timedelta(days=days_ago)
                 if past_date not in real_data_dates:
-                    # Try to capture this missing day from history
-                    await self._capture_from_history(entity_id, past_date)
+                    if self.household_consumption_sensor:
+                        value = await self._backfill_household_from_history(past_date)
+                        if value is not None and value >= 1.5:
+                            replaced = False
+                            for i, (d, c) in enumerate(self._daily_consumption_history):
+                                if d == past_date:
+                                    self._daily_consumption_history[i] = (past_date, value)
+                                    replaced = True
+                                    break
+                            if not replaced:
+                                self._daily_consumption_history.append((past_date, value))
+                            self._daily_consumption_history.sort(key=lambda x: x[0])
+                            self._daily_consumption_history = self._daily_consumption_history[-7:]
+                    else:
+                        await self._capture_from_history(entity_id, past_date)
                     await asyncio.sleep(0.1)  # Small delay between history queries
 
         # Calculate average from history
@@ -1551,10 +1623,12 @@ class ChargeDischargeController:
             return DEFAULT_BASE_CONSUMPTION_KWH
 
         real_count = sum(1 for _, c in self._daily_consumption_history if c != DEFAULT_BASE_CONSUMPTION_KWH)
+        source = "household sensor" if self.household_consumption_sensor else "battery discharge + grid"
         _LOGGER.info(
-            "Dynamic base consumption: %.1f kWh (avg of %d days, %d real + %d defaults)",
+            "Dynamic base consumption: %.1f kWh (avg of %d days, %d real + %d defaults, source: %s)",
             average, len(self._daily_consumption_history),
-            real_count, len(self._daily_consumption_history) - real_count
+            real_count, len(self._daily_consumption_history) - real_count,
+            source
         )
 
         return average
@@ -1676,6 +1750,113 @@ class ChargeDischargeController:
         except Exception as e:
             _LOGGER.error("Failed to capture from history for %s on %s: %s", entity_id, target_date, e)
 
+    async def _backfill_household_from_history(self, target_date) -> Optional[float]:
+        """Integrate household power sensor history for target_date → kWh.
+
+        Only counts time intervals that fall OUTSIDE the charging_time_slot
+        (the solar+battery window). Returns None if no usable data was found.
+        """
+        from datetime import date, datetime, time as dt_time, timedelta
+        from homeassistant.util import dt as dt_util
+
+        if not self.household_consumption_sensor:
+            return None
+
+        # Skip days that are not covered by the charging slot (battery doesn't operate those days)
+        if self.charging_time_slot:
+            day_names = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+            if day_names[target_date.weekday()] not in self.charging_time_slot.get("days", []):
+                _LOGGER.debug("Household backfill: skipping %s (not a slot day)", target_date)
+                return None
+
+        try:
+            from homeassistant.components.recorder import history, get_instance
+        except ImportError:
+            _LOGGER.warning("Recorder not available for household backfill")
+            return None
+
+        local_tz = dt_util.get_time_zone(self.hass.config.time_zone) or dt_util.UTC
+        start_time = datetime.combine(target_date, datetime.min.time()).replace(tzinfo=local_tz)
+        end_time = datetime.combine(target_date, datetime.max.time()).replace(tzinfo=local_tz)
+
+        # Parse charging_time_slot boundaries (if configured)
+        slot_start: Optional[dt_time] = None
+        slot_end: Optional[dt_time] = None
+        if self.charging_time_slot:
+            try:
+                slot_start = dt_time.fromisoformat(self.charging_time_slot["start_time"])
+                slot_end = dt_time.fromisoformat(self.charging_time_slot["end_time"])
+            except Exception:
+                pass
+
+        def _in_consumption_window(ts: datetime) -> bool:
+            """True when ts is outside the charging_time_slot."""
+            if slot_start is None or slot_end is None:
+                return True
+            t = ts.time().replace(tzinfo=None)
+            if slot_start <= slot_end:
+                in_slot = slot_start <= t <= slot_end
+            else:
+                in_slot = t >= slot_start or t <= slot_end
+            return not in_slot
+
+        try:
+            recorder_instance = get_instance(self.hass)
+            states_map = await recorder_instance.async_add_executor_job(
+                history.state_changes_during_period,
+                self.hass,
+                start_time,
+                end_time,
+                self.household_consumption_sensor,
+            )
+        except Exception as e:
+            _LOGGER.error("Household backfill query failed for %s: %s", target_date, e)
+            return None
+
+        entity_states = states_map.get(self.household_consumption_sensor, [])
+        if not entity_states:
+            _LOGGER.debug("No household sensor history for %s", target_date)
+            return None
+
+        # Integrate power × dt over the consumption window
+        energy_kwh = 0.0
+        prev_ts: Optional[datetime] = None
+        prev_kw: Optional[float] = None
+
+        for state in entity_states:
+            if state.state in ('unknown', 'unavailable'):
+                prev_ts = None
+                prev_kw = None
+                continue
+            try:
+                power_w = float(state.state)
+            except (ValueError, TypeError):
+                prev_ts = None
+                prev_kw = None
+                continue
+
+            unit = state.attributes.get("unit_of_measurement", "W")
+            power_kw = power_w / 1000.0 if unit == "W" else power_w
+            ts = state.last_updated
+
+            if prev_ts is not None and prev_kw is not None:
+                # Use the midpoint timestamp to decide if interval is in consumption window
+                mid_ts = prev_ts + (ts - prev_ts) / 2
+                if _in_consumption_window(mid_ts):
+                    dt_hours = (ts - prev_ts).total_seconds() / 3600.0
+                    energy_kwh += max(0.0, prev_kw) * dt_hours
+
+            prev_ts = ts
+            prev_kw = power_kw
+
+        if energy_kwh <= 0:
+            _LOGGER.debug("Household backfill for %s: no energy accumulated", target_date)
+            return None
+
+        result = round(energy_kwh, 2)
+        _LOGGER.debug("Household backfill for %s: %.2f kWh", target_date, result)
+        return result
+
     async def _startup_dynamic_pricing_evaluation(self) -> None:
         """Run dynamic pricing evaluation at startup if the 00:05 window was missed.
 
@@ -1737,24 +1918,24 @@ class ChargeDischargeController:
             sum(1 for _, c in self._daily_consumption_history if c != DEFAULT_BASE_CONSUMPTION_KWH)
         )
 
-        # Also capture today's running total from coordinators if available
-        coordinators_with_data = [c for c in self.coordinators if c.data]
-        if coordinators_with_data:
-            today_value = round(sum(
-                c.data.get("total_daily_discharging_energy", 0)
-                for c in coordinators_with_data
-            ) + self._daily_grid_at_min_soc_kwh, 2)
-            if today_value >= 1.5:
-                # Replace today's default with current running total
-                for i, (d, c) in enumerate(self._daily_consumption_history):
-                    if d == today:
-                        if c == DEFAULT_BASE_CONSUMPTION_KWH:
-                            self._daily_consumption_history[i] = (today, today_value)
-                            _LOGGER.info(
-                                "Startup backfill: replaced today's default with current value: %.2f kWh",
-                                today_value
-                            )
-                        break
+        if not self.household_consumption_sensor:
+            # Battery discharge method: also capture today's running total from coordinators
+            coordinators_with_data = [c for c in self.coordinators if c.data]
+            if coordinators_with_data:
+                today_value = round(sum(
+                    c.data.get("total_daily_discharging_energy", 0)
+                    for c in coordinators_with_data
+                ) + self._daily_grid_at_min_soc_kwh, 2)
+                if today_value >= 1.5:
+                    for i, (d, c) in enumerate(self._daily_consumption_history):
+                        if d == today:
+                            if c == DEFAULT_BASE_CONSUMPTION_KWH:
+                                self._daily_consumption_history[i] = (today, today_value)
+                                _LOGGER.info(
+                                    "Startup backfill: replaced today's default with current value: %.2f kWh",
+                                    today_value
+                                )
+                            break
 
         # Try to backfill past days from recorder history
         real_data_dates = {d for d, c in self._daily_consumption_history if c != DEFAULT_BASE_CONSUMPTION_KWH}
@@ -1762,7 +1943,21 @@ class ChargeDischargeController:
         for days_ago in range(1, 8):
             past_date = today - timedelta(days=days_ago)
             if past_date not in real_data_dates:
-                await self._capture_from_history(entity_id, past_date)
+                if self.household_consumption_sensor:
+                    value = await self._backfill_household_from_history(past_date)
+                    if value is not None and value >= 1.5:
+                        replaced = False
+                        for i, (d, c) in enumerate(self._daily_consumption_history):
+                            if d == past_date:
+                                self._daily_consumption_history[i] = (past_date, value)
+                                replaced = True
+                                break
+                        if not replaced:
+                            self._daily_consumption_history.append((past_date, value))
+                        self._daily_consumption_history.sort(key=lambda x: x[0])
+                        self._daily_consumption_history = self._daily_consumption_history[-7:]
+                else:
+                    await self._capture_from_history(entity_id, past_date)
                 await asyncio.sleep(0.1)
                 backfill_count += 1
 
@@ -1847,17 +2042,30 @@ class ChargeDischargeController:
 
         today = date.today()
 
-        # Read directly from coordinator data (sum across all batteries)
-        coordinators_with_data = [c for c in self.coordinators if c.data]
-        if not coordinators_with_data:
-            _LOGGER.warning("Daily consumption capture: no coordinators with data available")
-            return
+        # --- BIFURCATION: household sensor vs battery discharge estimation ---
+        if self.household_consumption_sensor:
+            current_value = round(self._household_energy_accumulator, 2)
+            if current_value < 1.5:
+                _LOGGER.warning(
+                    "Daily consumption capture: household accumulator too low (%.2f kWh), skipping",
+                    current_value
+                )
+                return
+        else:
+            # Read directly from coordinator data (sum across all batteries)
+            coordinators_with_data = [c for c in self.coordinators if c.data]
+            if not coordinators_with_data:
+                _LOGGER.warning("Daily consumption capture: no coordinators with data available")
+                return
+
+            current_value = None  # assigned in try block below
 
         try:
-            current_value = round(sum(
-                c.data.get("total_daily_discharging_energy", 0)
-                for c in coordinators_with_data
-            ) + self._daily_grid_at_min_soc_kwh, 2)
+            if not self.household_consumption_sensor:
+                current_value = round(sum(
+                    c.data.get("total_daily_discharging_energy", 0)
+                    for c in coordinators_with_data
+                ) + self._daily_grid_at_min_soc_kwh, 2)
 
             # Only capture if we have meaningful data (>= 1.5 kWh)
             if current_value < 1.5:
@@ -2131,6 +2339,7 @@ class ChargeDischargeController:
             "total_available_kwh": total_available_kwh,
             "energy_deficit_kwh": energy_deficit_kwh,
             "days_in_history": days_in_history,
+            "consumption_source": "household_sensor" if self.household_consumption_sensor else "battery_discharge",
             "reason": (
                 f"Energy deficit: {energy_deficit_kwh:.2f} kWh "
                 f"(available: {total_available_kwh:.2f} kWh < consumption: {avg_consumption_kwh:.2f} kWh)"
@@ -2168,15 +2377,122 @@ class ChargeDischargeController:
     
 
 
+    def _is_in_consumption_window(self) -> bool:
+        """Return True when we are OUTSIDE the charging_time_slot (solar+battery window).
+
+        If no charging_time_slot is configured, the consumption window is 24 h.
+        On days NOT covered by the slot, the battery is not in use → return False.
+        On days covered by the slot, return True only during the hours outside the slot.
+        """
+        if not self.charging_time_slot:
+            return True
+
+        from datetime import datetime
+        now = datetime.now()
+        current_day = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"][now.weekday()]
+
+        # Battery only operates on days covered by the charging slot
+        if current_day not in self.charging_time_slot["days"]:
+            return False
+
+        return not self._check_time_window()
+
+    async def _accumulate_household_consumption(self) -> None:
+        """Integrate household power sensor → kWh accumulator (called every control cycle).
+
+        Only accumulates during the solar+battery window (outside charging_time_slot).
+        Uses monotonic time to avoid issues with system clock changes.
+        """
+        from time import monotonic
+
+        if not self.household_consumption_sensor:
+            return
+
+        if not self._is_in_consumption_window():
+            # Outside measurement window — pause accumulation but don't reset timer
+            self._household_last_accumulation_time = None
+            return
+
+        state = self.hass.states.get(self.household_consumption_sensor)
+        if state is None or state.state in ('unknown', 'unavailable'):
+            if state is None:
+                _LOGGER.warning(
+                    "Household consumption sensor %s not found",
+                    self.household_consumption_sensor
+                )
+            return
+
+        try:
+            power_w = float(state.state)
+        except (ValueError, TypeError):
+            return
+
+        unit = state.attributes.get("unit_of_measurement", "W")
+        power_kw = power_w / 1000.0 if unit == "W" else power_w
+
+        now = monotonic()
+        if self._household_last_accumulation_time is not None:
+            dt_hours = (now - self._household_last_accumulation_time) / 3600.0
+            self._household_energy_accumulator += max(0.0, power_kw) * dt_hours
+        self._household_last_accumulation_time = now
+
+    async def _accumulate_solar_production(self) -> None:
+        """Integrate real-time solar production → kWh accumulator (called every control cycle).
+
+        Solar_W = House_W + Battery_Net_W - Grid_W
+
+        Requires household_consumption_sensor. Grid power comes from consumption_sensor.
+        Battery net power (positive = charging) is read from coordinator data.
+        Uses monotonic time to avoid issues with system clock changes.
+        """
+        from time import monotonic
+
+        if not self.household_consumption_sensor:
+            return
+
+        # Read house power
+        house_state = self.hass.states.get(self.household_consumption_sensor)
+        if house_state is None or house_state.state in ("unknown", "unavailable"):
+            self._solar_last_accumulation_time = None
+            return
+        try:
+            house_w = float(house_state.state)
+        except (ValueError, TypeError):
+            self._solar_last_accumulation_time = None
+            return
+        if house_state.attributes.get("unit_of_measurement", "W") == "kW":
+            house_w *= 1000.0
+
+        # Read grid power (positive = import, negative = export)
+        grid_state = self.hass.states.get(self.consumption_sensor)
+        grid_w = self._apply_meter_transform(grid_state)
+        if grid_w is None:
+            self._solar_last_accumulation_time = None
+            return
+
+        # Battery net power (positive = charging)
+        battery_net_w = sum(
+            (c.data.get("battery_power", 0) or 0)
+            for c in self.coordinators if c.data
+        )
+
+        solar_w = max(0.0, house_w + battery_net_w - grid_w)
+
+        now = monotonic()
+        if self._solar_last_accumulation_time is not None:
+            dt_hours = (now - self._solar_last_accumulation_time) / 3600.0
+            self._solar_production_accumulator += (solar_w / 1000.0) * dt_hours
+        self._solar_last_accumulation_time = now
+
     def _is_in_predictive_charging_slot(self) -> bool:
         """Check if we're currently within the predictive charging time slot."""
         if not self.predictive_charging_enabled or self.charging_time_slot is None:
             return False
-        
+
         # Check manual override
         if self.predictive_charging_overridden:
             return False
-        
+
         return self._check_time_window()
 
     async def _handle_predictive_grid_charging(self):
@@ -3431,6 +3747,199 @@ class ChargeDischargeController:
     # DYNAMIC PRICING: Control loop handler
     # =========================================================================
 
+    def _is_evening_reevaluation_time(self) -> bool:
+        """Return True when it's time for the late-day battery re-evaluation.
+
+        Triggers once per day either:
+        - 1.5 h before estimated T_end (when solar T_start was detected), or
+        - at EVENING_REEVAL_FALLBACK_HOUR (16:00) when no T_start was seen today.
+
+        Does not trigger after 23:00 to avoid clashing with the 00:05 evaluation.
+        """
+        from datetime import datetime
+        now = datetime.now()
+
+        if self._dp_evening_reevaluated_date == now.date():
+            return False
+
+        now_h = now.hour + now.minute / 60.0
+        if now_h >= 23.0:
+            return False
+
+        if self._solar_t_start is not None:
+            trigger_h = self._estimate_t_end() - EVENING_REEVAL_HOURS_BEFORE_TEND
+        else:
+            trigger_h = EVENING_REEVAL_FALLBACK_HOUR
+
+        return now_h >= trigger_h
+
+    async def _evaluate_evening_recharge(self) -> None:
+        """Late-day re-evaluation: charge batteries cheaply if solar fell short.
+
+        Runs once per day around T_end - 1.5h.  Checks the current battery SOC
+        against the configured max_soc and, accounting for remaining solar, decides
+        whether to schedule cheap remaining slots from now until midnight.
+
+        Decision flow:
+        1. Batteries already at target → skip.
+        2. Calculate remaining solar (actual accumulator if available, else sinusoidal).
+        3. Net deficit = energy_to_full - remaining_solar_for_battery.
+        4. Deficit < EVENING_DEFICIT_THRESHOLD_KWH → skip.
+        5. Parse today's future price slots; select cheapest to cover the deficit.
+        6. Merge into existing schedule (or create a new one).
+        7. Send notification.
+        """
+        from datetime import datetime
+
+        now = datetime.now()
+        today = now.date()
+        self._dp_evening_reevaluated_date = today  # mark before any early-returns
+
+        _LOGGER.info("Dynamic pricing: running evening re-evaluation at %s", now.strftime("%H:%M"))
+
+        # --- Battery state ---
+        coordinators_with_data = [c for c in self.coordinators if c.data]
+        if not coordinators_with_data:
+            _LOGGER.info("Evening recharge: no battery data, skipping")
+            return
+
+        # Energy needed to bring all batteries to their max_soc
+        energy_to_full_kwh = sum(
+            max(0.0, (c.max_soc - (c.data.get("battery_soc", c.max_soc) or 0)) / 100.0
+                * (c.data.get("battery_total_energy", 0) or 0))
+            for c in coordinators_with_data
+        )
+
+        if energy_to_full_kwh <= EVENING_DEFICIT_THRESHOLD_KWH:
+            _LOGGER.info(
+                "Evening recharge: batteries essentially full (%.2f kWh to target), skipping",
+                energy_to_full_kwh,
+            )
+            return
+
+        # --- Remaining solar estimate ---
+        now_h = now.hour + now.minute / 60.0
+        remaining_solar_kwh = 0.0
+
+        if self.solar_forecast_sensor:
+            forecast_state = self.hass.states.get(self.solar_forecast_sensor)
+            if forecast_state and forecast_state.state not in ("unknown", "unavailable"):
+                try:
+                    forecast_today = float(forecast_state.state) * 0.85
+                    if self.household_consumption_sensor and self._solar_production_accumulator > 0:
+                        remaining_solar_kwh = max(0.0, forecast_today - self._solar_production_accumulator)
+                    elif self._solar_t_start is not None:
+                        t_end = self._estimate_t_end()
+                        fraction_done = self._get_solar_fraction_done(now_h, self._solar_t_start, t_end)
+                        remaining_solar_kwh = forecast_today * (1.0 - fraction_done)
+                except (ValueError, TypeError):
+                    pass
+
+        # Subtract remaining house consumption from remaining solar (solar not available for battery)
+        if self._solar_t_start is not None:
+            t_end = self._estimate_t_end()
+            daylight_h = max(0.0, t_end - self._solar_t_start)
+            hours_to_t_end = max(0.0, t_end - now_h)
+            if daylight_h > 0:
+                avg_consumption_kwh = self._get_avg_daily_consumption()
+                remaining_consumption_kwh = (avg_consumption_kwh / daylight_h) * hours_to_t_end
+                remaining_solar_kwh = max(0.0, remaining_solar_kwh - remaining_consumption_kwh)
+
+        # --- Net deficit ---
+        evening_deficit_kwh = max(0.0, energy_to_full_kwh - remaining_solar_kwh)
+
+        if evening_deficit_kwh < EVENING_DEFICIT_THRESHOLD_KWH:
+            _LOGGER.info(
+                "Evening recharge: remaining solar sufficient "
+                "(to_full=%.2f kWh, solar_remaining=%.2f kWh) — no action",
+                energy_to_full_kwh, remaining_solar_kwh,
+            )
+            return
+
+        _LOGGER.info(
+            "Evening recharge: deficit %.2f kWh (to_full=%.2f, solar_remaining=%.2f) "
+            "— searching for cheap slots",
+            evening_deficit_kwh, energy_to_full_kwh, remaining_solar_kwh,
+        )
+
+        # --- Find cheap slots (today, future only) ---
+        slots = self._parse_price_data()
+        if not slots:
+            _LOGGER.warning("Evening recharge: no price data available")
+            return
+
+        # Exclude slots already in the morning schedule
+        if self._dynamic_pricing_schedule:
+            scheduled_starts = {s.start for s in self._dynamic_pricing_schedule.selected_slots}
+            slots = [s for s in slots if s.start not in scheduled_starts]
+
+        if not slots:
+            _LOGGER.info("Evening recharge: no additional slots available (all already scheduled)")
+            return
+
+        hours_needed = self._calculate_charging_hours_needed(evening_deficit_kwh)
+        selected = self._select_cheapest_hours(slots, hours_needed)
+
+        if not selected:
+            _LOGGER.warning("Evening recharge: no slots below price threshold")
+            return
+
+        # --- Merge into schedule ---
+        if self._dynamic_pricing_schedule:
+            merged = sorted(
+                self._dynamic_pricing_schedule.selected_slots + selected,
+                key=lambda s: s.start,
+            )
+            self._dynamic_pricing_schedule.selected_slots = merged
+            self._dynamic_pricing_schedule.charging_needed = True
+        else:
+            avg_price = sum(s.price for s in selected) / len(selected)
+            effective_power_kw = min(self.max_contracted_power, self.max_charge_capacity) / 1000.0
+            self._dynamic_pricing_schedule = DynamicPricingSchedule(
+                hours_needed=hours_needed,
+                selected_slots=selected,
+                average_price=avg_price,
+                estimated_cost=avg_price * effective_power_kw * hours_needed,
+                total_available_slots=len(slots),
+                evaluation_time=now,
+                energy_deficit_kwh=evening_deficit_kwh,
+                charging_needed=True,
+            )
+            self._dynamic_pricing_evaluated_date = today
+
+        _LOGGER.info(
+            "Evening recharge: scheduled %d slot(s) (%.1fh) for %.2f kWh deficit",
+            len(selected), hours_needed, evening_deficit_kwh,
+        )
+        await self._send_evening_recharge_notification(evening_deficit_kwh, selected)
+
+    async def _send_evening_recharge_notification(
+        self, deficit_kwh: float, slots: list
+    ) -> None:
+        """Send notification for the evening re-evaluation result."""
+        slots_str = ", ".join(
+            f"{s.start.strftime('%H:%M')}-{s.end.strftime('%H:%M')} ({s.price:.4f} {self._get_price_unit()})"
+            for s in slots
+        )
+        avg_soc = sum(
+            (c.data.get("battery_soc", 0) or 0)
+            for c in self.coordinators if c.data
+        ) / max(1, sum(1 for c in self.coordinators if c.data))
+        message = (
+            f"☀️ Solar ending — batteries not full ({avg_soc:.0f}% avg)\n"
+            f"⚡ Deficit: {deficit_kwh:.2f} kWh\n\n"
+            f"Cheap slots scheduled:\n{slots_str}"
+        )
+        await self.hass.services.async_call(
+            "persistent_notification",
+            "create",
+            {
+                "title": "Predictive Charging: Evening re-evaluation",
+                "message": message,
+                "notification_id": "predictive_charging_evening_reeval",
+            },
+        )
+
     async def _handle_dynamic_pricing_predictive_charging(self) -> None:
         """Handle predictive charging in dynamic pricing mode (called every 2.5s)."""
         now = datetime.now()
@@ -3458,6 +3967,10 @@ class ChargeDischargeController:
         # Phase 2.5: Pre-slot re-evaluation (1h before each upcoming slot)
         await self._check_dp_pre_slot_reevaluation()
 
+        # Phase 2.6: Evening re-evaluation when solar is winding down
+        if self._is_evening_reevaluation_time():
+            await self._evaluate_evening_recharge()
+
         # Phase 3: Daily reset at midnight
         today = now.date()
         if self._dynamic_pricing_evaluated_date is not None:
@@ -3469,6 +3982,7 @@ class ChargeDischargeController:
                 self._dp_eval_retry_count = 0
                 self._dp_pre_evaluated_slots = {}
                 self._dp_daily_avg_price = None
+                self._dp_evening_reevaluated_date = None
 
         # Phase 4: Check if we're in a selected cheap slot
         if self._dynamic_pricing_schedule and not self.predictive_charging_overridden:
@@ -3772,6 +4286,41 @@ class ChargeDischargeController:
         # Skip all operations if any coordinator is shutting down (integration unloading)
         if any(c._is_shutting_down for c in self.coordinators):
             return
+
+        # === HOUSEHOLD CONSUMPTION ACCUMULATION ===
+        # Run before manual mode check so samples are never lost
+        if self.household_consumption_sensor:
+            from datetime import date as _date
+            _today = _date.today()
+            if self._household_accumulator_date != _today:
+                if self._household_accumulator_date is not None:
+                    _LOGGER.info(
+                        "Household accumulator daily reset (was %.2f kWh for %s)",
+                        self._household_energy_accumulator,
+                        self._household_accumulator_date,
+                    )
+                self._household_energy_accumulator = 0.0
+                self._household_last_accumulation_time = None
+                self._household_accumulator_date = _today
+            if self._solar_accumulator_date != _today:
+                if self._solar_accumulator_date is not None:
+                    _LOGGER.info(
+                        "Solar production accumulator daily reset (was %.2f kWh for %s)",
+                        self._solar_production_accumulator,
+                        self._solar_accumulator_date,
+                    )
+                self._solar_production_accumulator = 0.0
+                self._solar_last_accumulation_time = None
+                self._solar_accumulator_date = _today
+        await self._accumulate_household_consumption()
+        await self._accumulate_solar_production()
+
+        # Persist accumulators to storage every 5 minutes (survive reloads/restarts)
+        from time import monotonic as _monotonic
+        _now_mono = _monotonic()
+        if _now_mono - self._accumulator_last_save_monotonic >= 300:
+            self._accumulator_last_save_monotonic = _now_mono
+            self._save_accumulators()
 
         # === MANUAL MODE CHECK (highest priority) ===
         # If manual mode is enabled, skip all automatic control logic
@@ -4592,6 +5141,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not controller._daily_consumption_history:
         controller._initialize_consumption_history_with_defaults()
         await controller._save_consumption_history()
+
+    # Restore household and solar accumulators from persistent storage
+    await controller._load_accumulators()
 
     # Restore weekly charge completion state from previous session
     await controller._load_weekly_charge_state()

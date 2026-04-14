@@ -44,9 +44,6 @@ Configuring it here makes it available to:
 
 You can also leave it blank and configure it later in those specific sections.
 
-<<<<<<< Updated upstream
-![Configuración del sensor principal](../assets/screenshots/configuration/main-sensor.png){ width="600"  style="display: block; margin: 0 auto;"}
-=======
 ---
 
 ## Household consumption sensor *(optional)*
@@ -76,4 +73,3 @@ The daily consumption figure feeds the same history that predictive charging and
     Both **W** and **kW** sensors are accepted. The integration reads the `unit_of_measurement` attribute and converts automatically.
 
 ![Main sensor configuration](../assets/screenshots/configuration/main-sensor.png){ width="600"  style="display: block; margin: 0 auto;"}
->>>>>>> Stashed changes

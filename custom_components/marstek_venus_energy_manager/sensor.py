@@ -135,6 +135,8 @@ async def async_setup_entry(
     if controller:
         entities.append(DailyGridAtMinSocSensor(controller))
 
+
+
     # Add configuration summary diagnostic sensor (hidden, for support purposes)
     entities.append(ConfigurationSummarySensor(hass, entry))
 

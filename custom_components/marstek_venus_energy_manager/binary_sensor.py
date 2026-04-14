@@ -241,6 +241,20 @@ class PredictiveChargingStatusSensor(BinarySensorEntity):
 
         attrs["max_contracted_power"] = self.controller.max_contracted_power
 
+        # Household consumption sensor diagnostics + accumulator persistence
+        if self.controller.household_consumption_sensor:
+            attrs["consumption_source"] = "household_sensor"
+            attrs["household_consumption_sensor"] = self.controller.household_consumption_sensor
+            attrs["household_consumption_battery_window_kwh"] = round(self.controller._household_energy_accumulator, 2)
+            if self.controller._household_accumulator_date is not None:
+                attrs["household_accumulator_date"] = self.controller._household_accumulator_date.isoformat()
+            # Solar production accumulator persistence
+            attrs["solar_production_today_kwh"] = round(self.controller._solar_production_accumulator, 2)
+            if self.controller._solar_accumulator_date is not None:
+                attrs["solar_accumulator_date"] = self.controller._solar_accumulator_date.isoformat()
+        else:
+            attrs["consumption_source"] = "battery_discharge"
+
         # Persist daily consumption history for restoration after restarts
         if hasattr(self.controller, '_daily_consumption_history') and self.controller._daily_consumption_history:
             attrs["daily_consumption_history"] = [
