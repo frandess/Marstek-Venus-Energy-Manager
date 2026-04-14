@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Dynamic pricing notification showed wrong "needed" value**: When no grid charging was required, the "Available ≥ X kWh needed" line always displayed the same value on both sides due to a broken formula (`abs(deficit) + consumption` algebraically equals `total_available` when no deficit exists). Fixed to show the actual average consumption. A second notification path (no price slots found) also omitted the numeric consumption value entirely ("≥ needed"); fixed to include it.
+
 ### Added
 - **Integration Status sensor**: New sensor (`sensor.marstek_venus_system_integration_status`) showing at a glance what the integration is currently doing. It reflects the highest-priority active mode and updates every poll cycle. Possible states: `Charging from Grid` (predictive grid charging active), `Weekly Full Charge` (charging to 100 %), `Charge Delayed`, `Waiting for Solar`, `Charging to Setpoint`, `Capacity Protection`, `No-Discharge Window` (inside a configured time slot), `Charging`, `Discharging`, `Standby` (within deadband, no action needed), `Manual Mode`, and `Initializing`. Fully translated into EN, ES, DE, FR, and NL.
 
