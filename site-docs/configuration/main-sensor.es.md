@@ -35,7 +35,7 @@ Déjalo desactivado si no estás seguro.
 
 ## Sensor de previsión solar *(opcional)*
 
-Sensor que proporciona la producción solar estimada para mañana, en **kWh** o **Wh**.
+Sensor que proporciona la producción solar estimada para hoy, en **kWh** o **Wh**.
 
 Configurarlo aquí lo pone a disposición de:
 
@@ -71,5 +71,40 @@ El consumo diario resultante alimenta el mismo historial que leen la carga predi
 
 !!! tip "Unidades admitidas"
     Se aceptan sensores en **W** y en **kW**. La integración lee el atributo `unit_of_measurement` y convierte automáticamente.
+
+### Crear un sensor helper
+
+El consumo del hogar es el balance de todos los flujos de potencia:
+
+**Consumo del hogar = Potencia de red + Producción solar + Descarga batería − Carga batería**
+
+Sin el término de batería, cuando carga estaríamos infracalculando el consumo y cuando descarga lo estaríamos sobreestimando.
+
+Si tu contador y la batería exponen estos valores como sensores separados, combínalos mediante un **helper de plantilla** en Home Assistant.
+
+**Ir a:** Configuración → Dispositivos y servicios → Helpers → Crear helper → Plantilla → Sensor de plantilla
+
+```jinja
+{% set potencia_red      = states('sensor.TU_SENSOR_POTENCIA_RED') | float(0) %}
+{% set potencia_solar    = states('sensor.TU_SENSOR_POTENCIA_SOLAR') | float(0) %}
+{% set descarga_bateria  = states('sensor.marstek_venus_system_potencia_de_descarga_del_sistema') | float(0) %}
+{% set carga_bateria     = states('sensor.marstek_venus_system_potencia_de_carga_del_sistema') | float(0) %}
+{{ (potencia_red + potencia_solar + descarga_bateria - carga_bateria) | round(0) }}
+```
+
+| Variable | Descripción | Ejemplo de entidad |
+|---|---|---|
+| `potencia_red` | Intercambio con la red (positivo = importar, negativo = exportar) | `sensor.shellypro3em_energy_meter_2_power` |
+| `potencia_solar` | Producción solar total | `sensor.shellypro3em_energy_meter_1_power` |
+| `descarga_bateria` | Potencia de descarga de la batería (positivo, W) | `sensor.marstek_venus_system_potencia_de_descarga_del_sistema` |
+| `carga_bateria` | Potencia de carga de la batería (positivo, W) | `sensor.marstek_venus_system_potencia_de_carga_del_sistema` |
+
+Establece la **unidad de medida** como `W` y la **clase de dispositivo** como `power`.
+
+!!! tip "Varias ramas solares"
+    Si tienes más de un inversor o string solar y no dispones de un sensor agregado único, súmalos:
+    ```jinja
+    {% set potencia_solar = states('sensor.STRING_SOLAR_1') | float(0) + states('sensor.STRING_SOLAR_2') | float(0) %}
+    ```
 
 ![Configuración del sensor principal](../assets/screenshots/configuration/main-sensor.png){ width="600"  style="display: block; margin: 0 auto;"}

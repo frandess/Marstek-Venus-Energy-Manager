@@ -35,7 +35,7 @@ Leave it disabled if you are unsure.
 
 ## Solar forecast sensor *(optional)*
 
-Sensor providing tomorrow's estimated solar production in **kWh** or **Wh**.
+Sensor providing today's estimated solar production in **kWh** or **Wh**.
 
 Configuring it here makes it available to:
 
@@ -71,5 +71,40 @@ The daily consumption figure feeds the same history that predictive charging and
 
 !!! tip "Supported units"
     Both **W** and **kW** sensors are accepted. The integration reads the `unit_of_measurement` attribute and converts automatically.
+
+### Creating a helper sensor
+
+Household consumption is the balance of all power flows:
+
+**House consumption = Grid power + Solar power + Battery discharge − Battery charge**
+
+Without the battery term, charging would undercount consumption and discharging would overcount it.
+
+If your meter and battery expose these as separate sensors, combine them using a **Template helper** in Home Assistant.
+
+**Go to:** Settings → Devices & Services → Helpers → Create Helper → Template → Template sensor
+
+```jinja
+{% set grid_power    = states('sensor.YOUR_GRID_POWER_SENSOR') | float(0) %}
+{% set solar_power   = states('sensor.YOUR_SOLAR_POWER_SENSOR') | float(0) %}
+{% set bat_discharge = states('sensor.YOUR_BATTERY_DISCHARGE_SENSOR') | float(0) %}
+{% set bat_charge    = states('sensor.YOUR_BATTERY_CHARGE_SENSOR') | float(0) %}
+{{ (grid_power + solar_power + bat_discharge - bat_charge) | round(0) }}
+```
+
+| Variable | Description | Example entity |
+|---|---|---|
+| `grid_power` | Grid exchange (positive = import, negative = export) | `sensor.shellypro3em_energy_meter_2_power` |
+| `solar_power` | Total solar production | `sensor.shellypro3em_energy_meter_1_power` |
+| `bat_discharge` | Battery discharge power (positive, W) | `sensor.marstek_venus_system_system_discharge_power` |
+| `bat_charge` | Battery charge power (positive, W) | `sensor.marstek_venus_system_system_charge_power` |
+
+Set the **unit of measurement** to `W` and the **device class** to `power`.
+
+!!! tip "Multiple solar strings"
+    If you have more than one inverter or solar branch and no single aggregated sensor, sum them:
+    ```jinja
+    {% set solar_power = states('sensor.SOLAR_STRING_1') | float(0) + states('sensor.SOLAR_STRING_2') | float(0) %}
+    ```
 
 ![Main sensor configuration](../assets/screenshots/configuration/main-sensor.png){ width="600"  style="display: block; margin: 0 auto;"}
