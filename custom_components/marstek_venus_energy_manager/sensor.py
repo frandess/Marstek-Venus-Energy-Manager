@@ -761,7 +761,10 @@ class IntegrationStatusSensor(SensorEntity):
                 return "charge_delayed"
             if delay_state.startswith("Waiting"):
                 return "waiting_for_solar"
-            if delay_state == "Charging to setpoint":
+            # Skip "charging_to_setpoint" if the controller is actively
+            # discharging: _is_charge_delayed() is not called during discharge
+            # so this state can be stale.
+            if delay_state == "Charging to setpoint" and c.previous_power >= 0:
                 return "charging_to_setpoint"
 
         # Priority 5: Capacity protection active
