@@ -67,7 +67,28 @@ La integración crea automáticamente entidades para cada batería configurada y
 |---|---|
 | `button.*_reset` | Reset del dispositivo |
 
-## Sensores agregados del sistema
+## Sensores del sistema
+
+### Estado de la integración
+
+`sensor.marstek_venus_system_integration_status` muestra de un vistazo qué está haciendo la integración en cada momento. Refleja el modo activo de mayor prioridad:
+
+| Estado | Descripción |
+|---|---|
+| `Cargando desde la Red` | Carga predictiva desde la red activa |
+| `Carga Semanal Completa` | Cargando al 100 % para balanceo de celdas |
+| `Carga Retrasada` | Carga bloqueada, esperando el momento óptimo según previsión solar |
+| `Esperando Solar` | Retraso de carga: esperando a que empiece la producción solar |
+| `Cargando al Setpoint` | Retraso de carga: cargando al SOC mínimo configurado |
+| `Protección de Capacidad` | Descarga limitada por baja batería (peak shaving activo) |
+| `Franja sin Descarga` | Dentro de una franja horaria configurada sin descarga |
+| `Cargando` | Cargando (excedente solar u otras condiciones) |
+| `Descargando` | Descargando para cubrir el consumo del hogar |
+| `En standby` | Sistema equilibrado dentro del deadband, sin acción |
+| `Modo Manual` | Modo manual activo — la integración no envía comandos automáticos |
+| `Iniciando` | Primera ejecución del controlador aún no completada |
+
+### Sensores agregados
 
 Disponibles bajo el prefijo `sensor.marstek_venus_system_*`, suman los valores de todas las baterías:
 
@@ -77,6 +98,5 @@ Disponibles bajo el prefijo `sensor.marstek_venus_system_*`, suman los valores d
 - `system_total_discharging_energy` — Energía total descargada (sistema)
 - `grid_at_min_soc` — Importación de red durante periodos en SOC mínimo (kWh)
 - `system_alarm_status` — Estado de alarma agregado de todas las baterías (`OK` / `Warning` / `Fault`); los atributos listan las condiciones activas por batería
-- `household_energy_today` — Consumo energético del hogar acumulado hoy a partir del sensor de potencia opcional, durante la franja solar+batería (kWh). Solo presente cuando hay un sensor de consumo del hogar configurado. Se reinicia a medianoche.
 
 ![Lista de entidades en Home Assistant](../assets/screenshots/reference/entities-list.png){ width="700"  style="display: block; margin: 0 auto;"}

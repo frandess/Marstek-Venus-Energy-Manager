@@ -622,6 +622,23 @@
       "active_batteries": { "name": "Actieve Batterijen" },
       "non_responsive_batteries": { "name": "Niet-reagerende Batterijen" },
       "configuration_summary": { "name": "Configuratieoverzicht" },
+      "integration_status": {
+        "name": "Integratiestatus",
+        "state": {
+          "initializing": "Initialiseren",
+          "manual": "Handmatige Modus",
+          "grid_charging": "Laden vanuit Net",
+          "weekly_full_charge": "Wekelijkse Volledige Lading",
+          "charge_delayed": "Lading Vertraagd",
+          "waiting_for_solar": "Wachten op Zon",
+          "charging_to_setpoint": "Laden naar Instelpunt",
+          "capacity_protection": "Capaciteitsbescherming",
+          "no_discharge_slot": "Ontlaad-Blokkeervenster",
+          "charging": "Laden",
+          "discharging": "Ontladen",
+          "balanced": "Standby"
+        }
+      },
       "weekly_full_charge": {
         "name": "Wekelijkse Volledige Lading",
         "state": {

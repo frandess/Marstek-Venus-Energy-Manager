@@ -621,6 +621,23 @@
       "active_batteries": { "name": "Active Batteries" },
       "non_responsive_batteries": { "name": "Non-Responsive Batteries" },
       "configuration_summary": { "name": "Configuration Summary" },
+      "integration_status": {
+        "name": "Integration Status",
+        "state": {
+          "initializing": "Initializing",
+          "manual": "Manual Mode",
+          "grid_charging": "Charging from Grid",
+          "weekly_full_charge": "Weekly Full Charge",
+          "charge_delayed": "Charge Delayed",
+          "waiting_for_solar": "Waiting for Solar",
+          "charging_to_setpoint": "Charging to Setpoint",
+          "capacity_protection": "Capacity Protection",
+          "no_discharge_slot": "No-Discharge Window",
+          "charging": "Charging",
+          "discharging": "Discharging",
+          "balanced": "Standby"
+        }
+      },
       "weekly_full_charge": {
         "name": "Weekly Full Charge",
         "state": {
