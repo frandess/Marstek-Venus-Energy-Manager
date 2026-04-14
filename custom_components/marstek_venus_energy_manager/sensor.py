@@ -127,6 +127,10 @@ async def async_setup_entry(
     if controller and has_charge_delay_config:
         entities.append(ChargeDelaySensor(hass, entry, controller))
 
+    # Add integration status sensor (always, when controller is present)
+    if controller:
+        entities.append(IntegrationStatusSensor(hass, entry, controller))
+
     # Add non-responsive batteries sensor (always, when controller is present)
     if controller:
         entities.append(NonResponsiveBatteriesSensor(hass, entry, controller, coordinators))
@@ -675,6 +679,112 @@ class ConfigurationSummarySensor(SensorEntity):
             attrs[f"excluded_device_{n}_allow_solar_surplus"] = dev.get("allow_solar_surplus", False)
 
         return attrs
+
+    @property
+    def device_info(self):
+        """Return device information for the system."""
+        return {
+            "identifiers": {(DOMAIN, "marstek_venus_system")},
+            "name": "Marstek Venus System",
+            "manufacturer": "Marstek",
+            "model": "Venus Multi-Battery System",
+        }
+
+
+class IntegrationStatusSensor(SensorEntity):
+    """Primary status sensor showing what the integration is currently doing.
+
+    Provides a single at-a-glance state representing the highest-priority
+    active mode, from manual override down to normal PD control.
+    """
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, controller) -> None:
+        """Initialize the integration status sensor."""
+        self.hass = hass
+        self.entry = entry
+        self._controller = controller
+
+        self._attr_has_entity_name = True
+        self._attr_translation_key = "integration_status"
+        self._attr_unique_id = f"{entry.entry_id}_integration_status"
+        self._attr_icon = "mdi:home-battery"
+        self._attr_should_poll = True
+
+    def _is_outside_discharge_window(self) -> bool:
+        """Return True if discharge is currently blocked by time slot configuration.
+
+        Time slots define WHEN discharge is allowed. If slots are configured and
+        the current time is outside all of them, discharge is blocked.
+        """
+        from datetime import datetime, time as dt_time
+        all_slots = self.entry.data.get("no_discharge_time_slots", [])
+        enabled_slots = [s for s in all_slots if s.get("enabled", True)]
+        if not enabled_slots:
+            return False  # No slots → discharge always allowed
+        now = datetime.now()
+        current_time = now.time()
+        current_day = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"][now.weekday()]
+        for slot in enabled_slots:
+            if current_day not in slot.get("days", []):
+                continue
+            try:
+                start = dt_time.fromisoformat(slot["start_time"])
+                end = dt_time.fromisoformat(slot["end_time"])
+            except Exception:
+                continue
+            if start <= current_time <= end:
+                return False  # Inside a discharge window → allowed
+        return True  # Outside all windows → blocked
+
+    @property
+    def native_value(self) -> str:
+        """Return the current integration status as a translation key."""
+        c = self._controller
+
+        # Priority 1: Manual mode overrides everything
+        if c.manual_mode_enabled:
+            return "manual"
+
+        # Priority 2: Predictive grid charging active
+        if c.predictive_charging_enabled and c.grid_charging_active:
+            return "grid_charging"
+
+        # Priority 3: Weekly full charge in progress
+        if c.weekly_full_charge_enabled:
+            if c._weekly_charge_status.get("state") == "Charging to 100%":
+                return "weekly_full_charge"
+
+        # Priority 4: Charge delay states
+        if c.charge_delay_enabled:
+            delay_state = c._charge_delay_status.get("state", "Idle")
+            if delay_state.startswith("Delayed"):
+                return "charge_delayed"
+            if delay_state.startswith("Waiting"):
+                return "waiting_for_solar"
+            # Skip "charging_to_setpoint" if the controller is actively
+            # discharging: _is_charge_delayed() is not called during discharge
+            # so this state can be stale.
+            if delay_state == "Charging to setpoint" and c.previous_power >= 0:
+                return "charging_to_setpoint"
+
+        # Priority 5: Capacity protection active
+        if c._capacity_protection_active:
+            return "capacity_protection"
+
+        # Priority 6: Outside all configured discharge windows
+        if self._is_outside_discharge_window():
+            return "no_discharge_slot"
+
+        # Priority 7: PD control state from last command
+        if c.first_execution:
+            return "initializing"
+
+        prev_power = c.previous_power
+        if prev_power > 0:
+            return "charging"
+        elif prev_power < 0:
+            return "discharging"
+        return "balanced"
 
     @property
     def device_info(self):
