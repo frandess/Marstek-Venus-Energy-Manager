@@ -81,6 +81,8 @@ from .const import (
     PRICE_INTEGRATION_PVPC,
     PRICE_INTEGRATION_CKW,
     CONF_METER_INVERTED,
+    CONF_PREDICTIVE_SAFETY_MARGIN_KWH,
+    DEFAULT_PREDICTIVE_SAFETY_MARGIN_KWH,
 )
 from .coordinator import MarstekVenusDataUpdateCoordinator
 
@@ -268,6 +270,8 @@ class ChargeDischargeController:
         self.weekly_full_charge_complete = False  # True when ALL batteries reach 100%
         self.last_checked_weekday = None  # Track day transitions for reset logic
         self.weekly_full_charge_registers_written = False  # True when register 44000 set to 100%
+        self._weekly_charge_needs_restore = False  # True when day changed mid-charge and hardware restore is pending
+        self._weekly_charge_saved_max_soc: dict[str, int] = {}  # coordinator.name → original max_soc before writing 100%
 
         # Unified Charge Delay state
         # Backward compat: new key takes priority, fallback to old keys
@@ -278,6 +282,7 @@ class ChargeDischargeController:
         self._delay_safety_margin_h = config_entry.data.get(CONF_DELAY_SAFETY_MARGIN_MIN, DEFAULT_DELAY_SAFETY_MARGIN_MIN) / 60.0
         self._delay_soc_setpoint_enabled = config_entry.data.get(CONF_DELAY_SOC_SETPOINT_ENABLED, DEFAULT_DELAY_SOC_SETPOINT_ENABLED)
         self._delay_soc_setpoint = config_entry.data.get(CONF_DELAY_SOC_SETPOINT, DEFAULT_DELAY_SOC_SETPOINT)
+        self._predictive_safety_margin_kwh: float = config_entry.data.get(CONF_PREDICTIVE_SAFETY_MARGIN_KWH, DEFAULT_PREDICTIVE_SAFETY_MARGIN_KWH)
         self._charge_delay_unlocked = False       # True when delay has been unlocked today
         self._charge_delay_last_date = None       # For daily reset
         self._charge_delay_forecast_cache = None  # Last forecast value used for balance check
@@ -342,6 +347,24 @@ class ChargeDischargeController:
 
     def update_pd_parameters(self):
         """Re-read PD controller parameters from config_entry.data (hot-reload)."""
+        # Update weekly full charge settings; reset completion state if day changed
+        new_weekly_day = self.config_entry.data.get(CONF_WEEKLY_FULL_CHARGE_DAY, "sun")
+        new_weekly_enabled = self.config_entry.data.get(CONF_ENABLE_WEEKLY_FULL_CHARGE, False)
+        day_changed = new_weekly_day != self.weekly_full_charge_day
+        feature_disabled = self.weekly_full_charge_enabled and not new_weekly_enabled
+        if day_changed or feature_disabled:
+            _LOGGER.info("Weekly Full Charge: %s - resetting completion state",
+                         f"day changed from {self.weekly_full_charge_day.upper()} to {new_weekly_day.upper()}"
+                         if day_changed else "feature disabled")
+            # If registers were written for a charge still in progress, schedule a hardware restore
+            if self.weekly_full_charge_registers_written and not self.weekly_full_charge_complete:
+                _LOGGER.info("Weekly Full Charge: Mid-charge abort detected - hardware restore pending")
+                self._weekly_charge_needs_restore = True
+            self.weekly_full_charge_complete = False
+            self.weekly_full_charge_registers_written = False
+        self.weekly_full_charge_enabled = new_weekly_enabled
+        self.weekly_full_charge_day = new_weekly_day
+
         self.deadband = self.config_entry.data.get(CONF_PD_DEADBAND, DEFAULT_PD_DEADBAND)
         self.kp = self.config_entry.data.get(CONF_PD_KP, DEFAULT_PD_KP)
         self.kd = self.config_entry.data.get(CONF_PD_KD, DEFAULT_PD_KD)
@@ -354,6 +377,7 @@ class ChargeDischargeController:
         self._charge_delay_status["safety_margin_min"] = int(self._delay_safety_margin_h * 60)
         self._delay_soc_setpoint_enabled = self.config_entry.data.get(CONF_DELAY_SOC_SETPOINT_ENABLED, DEFAULT_DELAY_SOC_SETPOINT_ENABLED)
         self._delay_soc_setpoint = self.config_entry.data.get(CONF_DELAY_SOC_SETPOINT, DEFAULT_DELAY_SOC_SETPOINT)
+        self._predictive_safety_margin_kwh = self.config_entry.data.get(CONF_PREDICTIVE_SAFETY_MARGIN_KWH, DEFAULT_PREDICTIVE_SAFETY_MARGIN_KWH)
         self._charge_delay_status["soc_setpoint"] = self._delay_soc_setpoint if self._delay_soc_setpoint_enabled else None
         self.charge_delay_enabled = self.config_entry.data.get(
             CONF_ENABLE_CHARGE_DELAY,
@@ -1417,6 +1441,34 @@ class ChargeDischargeController:
         - Restore register 44000 to configured max_soc when complete
         - Re-enable hysteresis after completion
         """
+        # Mid-charge abort: day changed (or feature disabled) while registers were already at 100%.
+        # Restore hardware cutoff to max_soc before anything else.
+        if self._weekly_charge_needs_restore:
+            _LOGGER.info("Weekly Full Charge: Restoring hardware cutoff registers after mid-charge abort")
+            for coordinator in self.coordinators:
+                cutoff_reg = coordinator.get_register("charging_cutoff_capacity")
+                if self._is_backup_function_active(coordinator):
+                    continue
+                if cutoff_reg is None:
+                    _LOGGER.debug("%s: No hardware cutoff register to restore (v3 battery)", coordinator.name)
+                    continue
+                try:
+                    # Use the saved value captured before writing 100%; fall back to current max_soc
+                    # only if no saved value exists (e.g. HA restarted mid-charge).
+                    original_max_soc = self._weekly_charge_saved_max_soc.get(
+                        coordinator.name, coordinator.max_soc
+                    )
+                    max_soc_value = int(original_max_soc / 0.1)
+                    await coordinator.write_register(cutoff_reg, max_soc_value, do_refresh=False)
+                    await asyncio.sleep(0.1)
+                    _LOGGER.info("%s: Restored hardware cutoff to %d%% after mid-charge abort",
+                                 coordinator.name, original_max_soc)
+                except Exception as e:
+                    _LOGGER.error("%s: Failed to restore charging cutoff register: %s", coordinator.name, e)
+            self._weekly_charge_saved_max_soc.clear()
+            self._weekly_charge_needs_restore = False
+            self._weekly_charge_status["state"] = "Idle"
+
         if not self.weekly_full_charge_enabled and not self._force_full_charge:
             return
         if not self._is_weekly_full_charge_active():
@@ -1449,15 +1501,22 @@ class ChargeDischargeController:
 
                 # v2 batteries: write hardware register
                 try:
+                    # Save original max_soc before overwriting the hardware register
+                    self._weekly_charge_saved_max_soc[coordinator.name] = coordinator.max_soc
                     # Write 1000 to register 44000 (100% = 1000 in register scale)
                     await coordinator.write_register(cutoff_reg, 1000, do_refresh=False)
                     await asyncio.sleep(0.1)
-                    _LOGGER.debug("%s: Set hardware charging cutoff to 100%%", coordinator.name)
+                    _LOGGER.debug("%s: Set hardware charging cutoff to 100%% (saved original max_soc=%d%%)",
+                                  coordinator.name, coordinator.max_soc)
                 except Exception as e:
                     _LOGGER.error("%s: Failed to write charging cutoff register: %s", coordinator.name, e)
 
             self.weekly_full_charge_registers_written = True
             self._weekly_charge_status["state"] = "Charging to 100%"
+            # Persist registers_written immediately so that if HA restarts mid-charge
+            # the stored state reflects the hardware being at 100%, enabling the
+            # day-change abort logic to correctly set _weekly_charge_needs_restore.
+            asyncio.create_task(self._save_weekly_charge_state())
 
         # Check if all batteries reached 100%
         all_batteries_full = all(
@@ -1486,19 +1545,29 @@ class ChargeDischargeController:
 
                 # v2: restore hardware register
                 try:
-                    max_soc_value = int(coordinator.max_soc / 0.1)  # Convert to register value
+                    original_max_soc = self._weekly_charge_saved_max_soc.get(
+                        coordinator.name, coordinator.max_soc
+                    )
+                    max_soc_value = int(original_max_soc / 0.1)  # Convert to register value
                     await coordinator.write_register(cutoff_reg, max_soc_value, do_refresh=False)
                     await asyncio.sleep(0.1)
                     _LOGGER.debug("%s: Restored hardware cutoff to %d%% (reg=%d)",
-                                coordinator.name, coordinator.max_soc, max_soc_value)
+                                coordinator.name, original_max_soc, max_soc_value)
                 except Exception as e:
                     _LOGGER.error("%s: Failed to restore charging cutoff register: %s", coordinator.name, e)
+
+            self._weekly_charge_saved_max_soc.clear()
 
             # Re-enable hysteresis for batteries that have it configured
             for coordinator in self.coordinators:
                 if coordinator.enable_charge_hysteresis:
                     coordinator._hysteresis_active = True
-                    _LOGGER.debug("%s: Re-enabled hysteresis after weekly full charge", coordinator.name)
+                    # Set base SOC to current level (~100% after full charge) so the threshold
+                    # is "actual peak SOC - hysteresis" (e.g. 90%), not "max_soc - hysteresis" (e.g. 70%)
+                    current_soc = coordinator.data.get("battery_soc", 100) if coordinator.data else 100
+                    coordinator._hysteresis_base_soc = current_soc
+                    _LOGGER.debug("%s: Re-enabled hysteresis after weekly full charge (base SOC: %.1f%%)",
+                                  coordinator.name, coordinator._hysteresis_base_soc)
 
             # Persist the completion state so it survives HA restarts
             await self._save_weekly_charge_state()
@@ -2220,6 +2289,10 @@ class ChargeDischargeController:
         min_reserve_kwh = usable_energy_kwh  # Dynamic buffer: 0 at cutoff, positive above
         effective_min_soc = min_soc  # Actual hardware cutoff, no safety margin
 
+        # Safety margin: user-configurable buffer added to consumption forecast.
+        # Guardrail: never exceed total system capacity.
+        safety_margin_kwh = min(self._predictive_safety_margin_kwh, total_capacity_kwh)
+
         # Get dynamic consumption forecast
         avg_consumption_kwh = await self._get_dynamic_base_consumption()
         days_in_history = len(self._daily_consumption_history)
@@ -2231,7 +2304,7 @@ class ChargeDischargeController:
         if forecast_state is None or forecast_state.state in ("unknown", "unavailable"):
             # Conservative mode: assume zero solar, compare usable vs consumption
             total_available_kwh = usable_energy_kwh
-            energy_deficit_kwh = avg_consumption_kwh - total_available_kwh
+            energy_deficit_kwh = avg_consumption_kwh + safety_margin_kwh - total_available_kwh
             should_charge = energy_deficit_kwh > 0
 
             _LOGGER.warning(
@@ -2266,7 +2339,7 @@ class ChargeDischargeController:
         except (ValueError, TypeError):
             # Treat invalid as unavailable - use same conservative logic
             total_available_kwh = usable_energy_kwh
-            energy_deficit_kwh = avg_consumption_kwh - total_available_kwh
+            energy_deficit_kwh = avg_consumption_kwh + safety_margin_kwh - total_available_kwh
             should_charge = energy_deficit_kwh > 0
 
             _LOGGER.error(
@@ -2298,7 +2371,7 @@ class ChargeDischargeController:
 
         # === STEP 6: Calculate Energy Balance and Decide ===
         total_available_kwh = usable_energy_kwh + solar_forecast_kwh
-        energy_deficit_kwh = avg_consumption_kwh - total_available_kwh
+        energy_deficit_kwh = avg_consumption_kwh + safety_margin_kwh - total_available_kwh
         should_charge = energy_deficit_kwh > 0
 
         _LOGGER.info(
@@ -2311,8 +2384,9 @@ class ChargeDischargeController:
             "  Energy Balance:\n"
             "    - Solar forecast: %.2f kWh\n"
             "    - Consumption forecast: %.2f kWh (%d-day avg)\n"
+            "    - Safety margin: %.2f kWh\n"
             "    - Total available: %.2f kWh (usable + solar)\n"
-            "    - Energy deficit: %.2f kWh\n"
+            "    - Energy deficit: %.2f kWh (consumption + margin - available)\n"
             "  → Decision: %s",
             total_capacity_kwh,
             avg_soc, stored_energy_kwh,
@@ -2320,6 +2394,7 @@ class ChargeDischargeController:
             usable_energy_kwh,
             solar_forecast_kwh,
             avg_consumption_kwh, days_in_history,
+            safety_margin_kwh,
             total_available_kwh,
             energy_deficit_kwh,
             "ACTIVATE CHARGING" if should_charge else "NO CHARGING NEEDED"
@@ -2342,10 +2417,12 @@ class ChargeDischargeController:
             "consumption_source": "household_sensor" if self.household_consumption_sensor else "battery_discharge",
             "reason": (
                 f"Energy deficit: {energy_deficit_kwh:.2f} kWh "
-                f"(available: {total_available_kwh:.2f} kWh < consumption: {avg_consumption_kwh:.2f} kWh)"
+                f"(available: {total_available_kwh:.2f} kWh < consumption: {avg_consumption_kwh:.2f} kWh"
+                + (f" + margin: {safety_margin_kwh:.2f} kWh" if safety_margin_kwh > 0 else "") + ")"
                 if should_charge else
                 f"Sufficient energy: {total_available_kwh:.2f} kWh available "
                 f"≥ {avg_consumption_kwh:.2f} kWh consumption"
+                + (f" + {safety_margin_kwh:.2f} kWh margin" if safety_margin_kwh > 0 else "")
             )
         }
 
