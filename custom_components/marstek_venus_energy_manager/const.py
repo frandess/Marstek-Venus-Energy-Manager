@@ -1693,6 +1693,10 @@ CONF_MAX_CONTRACTED_POWER = "max_contracted_power"
 # Default base consumption fallback (kWh/day)
 DEFAULT_BASE_CONSUMPTION_KWH = 5.0  # Fallback when no consumption history available
 
+# Predictive charging safety margin
+CONF_PREDICTIVE_SAFETY_MARGIN_KWH = "predictive_safety_margin_kwh"
+DEFAULT_PREDICTIVE_SAFETY_MARGIN_KWH = 0.0  # kWh added to consumption forecast; 0 = no margin
+
 # Re-evaluation thresholds
 SOC_REEVALUATION_THRESHOLD = 30  # Re-evaluate every 30% SOC drop
 
@@ -1901,5 +1905,16 @@ CONFIG_NUMBER_DEFINITIONS = [
         "default": DEFAULT_CAPACITY_PROTECTION_LIMIT,
         "icon": "mdi:flash-alert",
         "condition": CONF_CAPACITY_PROTECTION_ENABLED,
+    },
+    {
+        "key": CONF_PREDICTIVE_SAFETY_MARGIN_KWH,
+        "name": "Solar Forecast Safety Margin",
+        "min": 0.0,
+        "max": 20.0,
+        "step": 0.1,
+        "unit": "kWh",
+        "default": DEFAULT_PREDICTIVE_SAFETY_MARGIN_KWH,
+        "icon": "mdi:solar-power-variant",
+        "condition": CONF_ENABLE_PREDICTIVE_CHARGING,
     },
 ]
