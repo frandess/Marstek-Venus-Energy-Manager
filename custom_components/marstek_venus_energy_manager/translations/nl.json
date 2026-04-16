@@ -257,6 +257,35 @@
           "capacity_protection_soc_threshold": "Wanneer de gemiddelde batterij-SOC onder deze waarde daalt, wordt de piekbegrenzing geactiveerd. De batterij stopt met ontladen voor normaal verbruik en dekt alleen pieken boven de limiet.",
           "capacity_protection_limit": "Netimport vermogensdrempel. Wanneer het huisverbruik deze waarde overschrijdt en de piekbegrenzing actief is, ontlaadt de batterij alleen het overschot boven deze limiet."
         }
+      },
+      "pd_advanced": {
+        "title": "Geavanceerde PD-regelaar parameters",
+        "description": "Configureer geavanceerde PD-regelaar parameters voor het afstemmen van het laad-/ontlaadgedrag van de batterij. Wijzig deze waarden alleen als u de PID-regeltheorie begrijpt. De standaardwaarden werken goed voor de meeste installaties.",
+        "data": {
+          "configure_pd_advanced": "Geavanceerde PD-regelaar parameters configureren"
+        }
+      },
+      "pd_advanced_config": {
+        "title": "PD-regelaar configuratie",
+        "description": "Stel de proportioneel-differentiële regelaar in die de batterijvermogensaanpassingen beheert.",
+        "data": {
+          "pd_kp": "Kp - Proportionele versterking",
+          "pd_kd": "Kd - Differentiële versterking",
+          "pd_deadband": "Dode band (W)",
+          "pd_max_power_change": "Max vermogenswijziging per cyclus (W)",
+          "pd_direction_hysteresis": "Richting hysterese (W)",
+          "pd_min_charge_power": "Minimaal laadvermogen (W)",
+          "pd_min_discharge_power": "Minimaal ontlaadvermogen (W)"
+        },
+        "data_description": {
+          "pd_kp": "Responsiviteit op netwerk onbalans. Hogere waarden = snellere respons maar risico op overshoot. Bereik: 0.1-2.0, standaard: 0.65",
+          "pd_kd": "Demping om oscillatie te voorkomen. Hogere waarden = soepelere overgangen maar tragere stabilisatie. Bereik: 0.0-2.0, standaard: 0.5",
+          "pd_deadband": "Netwerk vermogenstolerantie rond nul. Voorkomt micro-aanpassingen bij kleine fluctuaties. Bereik: 0-200W, standaard: 40W",
+          "pd_max_power_change": "Maximale batterijvermogenswijziging per regelcyclus (2.5s). Voorkomt abrupte commando's. Bereik: 100-2000W, standaard: 800W",
+          "pd_direction_hysteresis": "Vermogensdrempel vereist om te schakelen tussen laden en ontladen. Voorkomt snelle richtingsveranderingen. Bereik: 0-200W, standaard: 60W",
+          "pd_min_charge_power": "Minimaal vermogen om te laden. Onder deze drempel blijft de regelaar inactief in plaats van laden op laag vermogen. 0 = uitgeschakeld.",
+          "pd_min_discharge_power": "Minimaal vermogen om te ontladen. Onder deze drempel blijft de regelaar inactief in plaats van ontladen op laag vermogen. 0 = uitgeschakeld."
+        }
       }
     },
     "error": {
@@ -275,7 +304,22 @@
     "step": {
       "init": {
         "title": "Marstek Venus Energy Manager opnieuw configureren",
-        "description": "Wijzig de integratieconfiguratie. Wijzigingen worden toegepast bij het herstarten van de integratie.",
+        "description": "Selecteer de sectie die u wilt configureren.",
+        "menu_options": {
+          "sensors": "Sensoren",
+          "batteries": "Batterijen",
+          "time_slots": "Ontladingsblokkering tijdsloten",
+          "excluded_devices": "Uitgesloten apparaten",
+          "predictive_charging": "Voorspellend laden",
+          "weekly_full_charge": "Wekelijkse volledige lading",
+          "charge_delay": "Zonne-oplaadvertraging",
+          "capacity_protection": "Capaciteitsbescherming",
+          "pd_advanced": "PD-regelaar (geavanceerd)"
+        }
+      },
+      "sensors": {
+        "title": "Sensoren",
+        "description": "Configureer de sensoren die door de integratie worden gebruikt.",
         "data": {
           "consumption_sensor": "Netverbruikssensor",
           "solar_forecast_sensor": "Zonne-voorspellingssensor (optioneel)",

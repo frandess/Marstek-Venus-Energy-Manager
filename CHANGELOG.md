@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.6.6] - 2026-04-16
+
+### Added
+- **PD controller advanced step in initial config flow**: The setup wizard now includes a final step for advanced PD controller tuning, matching what was already available in the options flow. After the peak shaving step, users are asked whether they want to configure the PD parameters (Kp, Kd, deadband, max power change, direction hysteresis, minimum charge/discharge power). Choosing "No" applies the defaults automatically; choosing "Yes" opens the parameter form. This ensures expert users can tune the controller at first installation without needing to re-enter the options flow afterwards.
+- **Options flow menu**: The options flow now uses a menu instead of a linear wizard, allowing users to jump directly to any section — sensors, batteries, time slots, excluded devices, predictive charging, weekly full charge, solar charge delay, peak shaving, or PD controller — without stepping through unrelated screens.
+
 ## [1.6.5] - 2026-04-15
 
 ### Fixed

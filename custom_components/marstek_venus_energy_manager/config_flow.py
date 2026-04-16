@@ -981,9 +981,7 @@ class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
                 return await self.async_step_capacity_protection_config()
             else:
                 self.config_data[CONF_CAPACITY_PROTECTION_ENABLED] = False
-                return self.async_create_entry(
-                    title="Marstek Venus Energy Manager", data=self.config_data
-                )
+                return await self.async_step_pd_advanced()
 
         return self.async_show_form(
             step_id="capacity_protection",
@@ -1002,9 +1000,7 @@ class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
             self.config_data[CONF_CAPACITY_PROTECTION_ENABLED] = True
             self.config_data[CONF_CAPACITY_PROTECTION_SOC_THRESHOLD] = int(user_input["capacity_protection_soc_threshold"])
             self.config_data[CONF_CAPACITY_PROTECTION_LIMIT] = int(user_input["capacity_protection_limit"])
-            return self.async_create_entry(
-                title="Marstek Venus Energy Manager", data=self.config_data
-            )
+            return await self.async_step_pd_advanced()
 
         return self.async_show_form(
             step_id="capacity_protection_config",
@@ -1022,6 +1018,104 @@ class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
                         NumberSelector(
                             NumberSelectorConfig(
                                 min=2500, max=8000, step=100,
+                                mode=NumberSelectorMode.SLIDER,
+                                unit_of_measurement="W",
+                            )
+                        ),
+                }
+            ),
+        )
+
+    async def async_step_pd_advanced(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Ask if user wants to configure advanced PD controller parameters."""
+        if user_input is not None:
+            if user_input.get("configure_pd_advanced", False):
+                return await self.async_step_pd_advanced_config()
+            else:
+                self.config_data[CONF_PD_KP] = DEFAULT_PD_KP
+                self.config_data[CONF_PD_KD] = DEFAULT_PD_KD
+                self.config_data[CONF_PD_DEADBAND] = DEFAULT_PD_DEADBAND
+                self.config_data[CONF_PD_MAX_POWER_CHANGE] = DEFAULT_PD_MAX_POWER_CHANGE
+                self.config_data[CONF_PD_DIRECTION_HYSTERESIS] = DEFAULT_PD_DIRECTION_HYSTERESIS
+                self.config_data[CONF_PD_MIN_CHARGE_POWER] = DEFAULT_PD_MIN_CHARGE_POWER
+                self.config_data[CONF_PD_MIN_DISCHARGE_POWER] = DEFAULT_PD_MIN_DISCHARGE_POWER
+                return self.async_create_entry(
+                    title="Marstek Venus Energy Manager", data=self.config_data
+                )
+
+        return self.async_show_form(
+            step_id="pd_advanced",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("configure_pd_advanced", default=False): bool,
+                }
+            ),
+        )
+
+    async def async_step_pd_advanced_config(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Configure PD controller advanced parameters."""
+        if user_input is not None:
+            self.config_data[CONF_PD_KP] = user_input["pd_kp"]
+            self.config_data[CONF_PD_KD] = user_input["pd_kd"]
+            self.config_data[CONF_PD_DEADBAND] = user_input["pd_deadband"]
+            self.config_data[CONF_PD_MAX_POWER_CHANGE] = user_input["pd_max_power_change"]
+            self.config_data[CONF_PD_DIRECTION_HYSTERESIS] = user_input["pd_direction_hysteresis"]
+            self.config_data[CONF_PD_MIN_CHARGE_POWER] = user_input["pd_min_charge_power"]
+            self.config_data[CONF_PD_MIN_DISCHARGE_POWER] = user_input["pd_min_discharge_power"]
+            return self.async_create_entry(
+                title="Marstek Venus Energy Manager", data=self.config_data
+            )
+
+        return self.async_show_form(
+            step_id="pd_advanced_config",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("pd_kp", default=DEFAULT_PD_KP):
+                        NumberSelector(
+                            NumberSelectorConfig(
+                                min=0.1, max=2.0, step=0.05, mode=NumberSelectorMode.BOX
+                            )
+                        ),
+                    vol.Required("pd_kd", default=DEFAULT_PD_KD):
+                        NumberSelector(
+                            NumberSelectorConfig(
+                                min=0.0, max=2.0, step=0.05, mode=NumberSelectorMode.BOX
+                            )
+                        ),
+                    vol.Required("pd_deadband", default=DEFAULT_PD_DEADBAND):
+                        NumberSelector(
+                            NumberSelectorConfig(
+                                min=0, max=200, step=5, mode=NumberSelectorMode.SLIDER
+                            )
+                        ),
+                    vol.Required("pd_max_power_change", default=DEFAULT_PD_MAX_POWER_CHANGE):
+                        NumberSelector(
+                            NumberSelectorConfig(
+                                min=100, max=2000, step=50, mode=NumberSelectorMode.SLIDER
+                            )
+                        ),
+                    vol.Required("pd_direction_hysteresis", default=DEFAULT_PD_DIRECTION_HYSTERESIS):
+                        NumberSelector(
+                            NumberSelectorConfig(
+                                min=0, max=200, step=5, mode=NumberSelectorMode.SLIDER
+                            )
+                        ),
+                    vol.Optional("pd_min_charge_power", default=DEFAULT_PD_MIN_CHARGE_POWER):
+                        NumberSelector(
+                            NumberSelectorConfig(
+                                min=0, max=2000, step=10,
+                                mode=NumberSelectorMode.SLIDER,
+                                unit_of_measurement="W",
+                            )
+                        ),
+                    vol.Optional("pd_min_discharge_power", default=DEFAULT_PD_MIN_DISCHARGE_POWER):
+                        NumberSelector(
+                            NumberSelectorConfig(
+                                min=0, max=2000, step=10,
                                 mode=NumberSelectorMode.SLIDER,
                                 unit_of_measurement="W",
                             )
@@ -1130,8 +1224,35 @@ class OptionsFlowHandler(OptionsFlow):
                     pass
                 return False
 
+    async def _save_and_finish(self) -> FlowResult:
+        """Merge config_data into existing entry data, save, and reload."""
+        new_data = dict(self.config_entry.data)
+        new_data.update(self.config_data)
+        self.hass.config_entries.async_update_entry(
+            self.config_entry, data=new_data
+        )
+        await self.hass.config_entries.async_reload(self.config_entry.entry_id)
+        return self.async_create_entry(title="", data={})
+
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        """Start the options flow - ask for consumption sensor and optional solar forecast sensor."""
+        """Show menu to select which section to configure."""
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=[
+                "sensors",
+                "batteries",
+                "time_slots",
+                "excluded_devices",
+                "predictive_charging",
+                "weekly_full_charge",
+                "charge_delay",
+                "capacity_protection",
+                "pd_advanced",
+            ],
+        )
+
+    async def async_step_sensors(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Configure consumption sensor and optional solar forecast sensor."""
         errors = {}
         try:
             if user_input is not None:
@@ -1162,7 +1283,7 @@ class OptionsFlowHandler(OptionsFlow):
                     self.config_data[CONF_SOLAR_FORECAST_SENSOR] = forecast_sensor
                     self.config_data[CONF_HOUSEHOLD_CONSUMPTION_SENSOR] = household_sensor
                     self.config_data[CONF_METER_INVERTED] = user_input.get(CONF_METER_INVERTED, False)
-                    return await self.async_step_batteries()
+                    return await self._save_and_finish()
 
             # Load current configuration with defensive defaults
             current_sensor = self.config_entry.data.get("consumption_sensor", "")
@@ -1170,11 +1291,11 @@ class OptionsFlowHandler(OptionsFlow):
             current_household = self.config_entry.data.get(CONF_HOUSEHOLD_CONSUMPTION_SENSOR, "")
             current_inverted = self.config_entry.data.get(CONF_METER_INVERTED, False)
         except Exception as e:
-            _LOGGER.error("Error in options flow init: %s", e, exc_info=True)
+            _LOGGER.error("Error in options flow sensors: %s", e, exc_info=True)
             return self.async_abort(reason="unknown_error")
 
         return self.async_show_form(
-            step_id="init",
+            step_id="sensors",
             data_schema=vol.Schema(
                 {
                     vol.Required("consumption_sensor", default=current_sensor):
@@ -1309,7 +1430,7 @@ class OptionsFlowHandler(OptionsFlow):
                 num_batteries = self.config_data.get("num_batteries", 1)
                 if self.battery_index >= num_batteries:
                     self.config_data["batteries"] = self.battery_configs
-                    return await self.async_step_time_slots()
+                    return await self._save_and_finish()
                 return await self.async_step_battery_connection()
 
             if self.battery_index < len(current_batteries):
@@ -1368,7 +1489,7 @@ class OptionsFlowHandler(OptionsFlow):
                 return await self.async_step_add_time_slot()
             else:
                 self.config_data["no_discharge_time_slots"] = []
-                return await self.async_step_excluded_devices()
+                return await self._save_and_finish()
 
         # Check if time slots were previously configured
         existing_slots = self.config_entry.data.get("no_discharge_time_slots", [])
@@ -1408,7 +1529,7 @@ class OptionsFlowHandler(OptionsFlow):
                         return await self.async_step_add_more_slots()
                     else:
                         self.config_data["no_discharge_time_slots"] = self.time_slots
-                        return await self.async_step_excluded_devices()
+                        return await self._save_and_finish()
 
         # Load defaults from existing slots or user_input (on error re-show)
         if user_input:
@@ -1479,7 +1600,7 @@ class OptionsFlowHandler(OptionsFlow):
                 return await self.async_step_add_time_slot()
             else:
                 self.config_data["no_discharge_time_slots"] = self.time_slots
-                return await self.async_step_excluded_devices()
+                return await self._save_and_finish()
 
         # Check if there are more existing slots to show
         existing_slots = self.config_entry.data.get("no_discharge_time_slots", [])
@@ -1508,9 +1629,8 @@ class OptionsFlowHandler(OptionsFlow):
                 self.excluded_devices = []
                 return await self.async_step_add_excluded_device()
             else:
-                # No excluded devices configured, move to predictive charging
                 self.config_data["excluded_devices"] = []
-                return await self.async_step_predictive_charging()
+                return await self._save_and_finish()
 
         # Check if excluded devices were previously configured
         existing_devices = self.config_entry.data.get("excluded_devices", [])
@@ -1546,9 +1666,8 @@ class OptionsFlowHandler(OptionsFlow):
             if len(self.excluded_devices) < 4:
                 return await self.async_step_add_more_excluded_devices()
             else:
-                # Max devices reached, move to predictive charging
                 self.config_data["excluded_devices"] = self.excluded_devices
-                return await self.async_step_predictive_charging()
+                return await self._save_and_finish()
 
         # Load existing excluded devices if available and not yet added
         current_devices = self.config_entry.data.get("excluded_devices", [])
@@ -1592,9 +1711,8 @@ class OptionsFlowHandler(OptionsFlow):
             if user_input.get("add_more", False):
                 return await self.async_step_add_excluded_device()
             else:
-                # User finished adding devices, move to predictive charging
                 self.config_data["excluded_devices"] = self.excluded_devices
-                return await self.async_step_predictive_charging()
+                return await self._save_and_finish()
 
         # Check if there are more existing devices to show
         existing_devices = self.config_entry.data.get("excluded_devices", [])
@@ -1624,10 +1742,8 @@ class OptionsFlowHandler(OptionsFlow):
                 self.config_data["enable_predictive_charging"] = False
                 self.config_data["charging_time_slot"] = None
                 self.config_data[CONF_PREDICTIVE_CHARGING_MODE] = PREDICTIVE_MODE_TIME_SLOT
-                if not self.config_data.get(CONF_SOLAR_FORECAST_SENSOR):
-                    self.config_data[CONF_SOLAR_FORECAST_SENSOR] = None
-                self.config_data["max_contracted_power"] = 7000
-                return await self.async_step_weekly_full_charge()
+                self.config_data["max_contracted_power"] = self.config_entry.data.get("max_contracted_power", 7000)
+                return await self._save_and_finish()
 
         is_predictive_enabled = self.config_entry.data.get("enable_predictive_charging", False)
 
@@ -1687,12 +1803,12 @@ class OptionsFlowHandler(OptionsFlow):
         forecast_sensor_current = existing_config.get("solar_forecast_sensor", "")
         max_power_current = existing_config.get("max_contracted_power", 7000)
 
-        has_global_sensor = bool(self.config_data.get(CONF_SOLAR_FORECAST_SENSOR))
+        has_global_sensor = bool(self.config_entry.data.get(CONF_SOLAR_FORECAST_SENSOR))
 
         if user_input is not None:
             try:
                 if has_global_sensor:
-                    forecast_sensor = self.config_data[CONF_SOLAR_FORECAST_SENSOR]
+                    forecast_sensor = self.config_entry.data[CONF_SOLAR_FORECAST_SENSOR]
                 else:
                     forecast_sensor = user_input.get("solar_forecast_sensor")
                     if forecast_sensor:
@@ -1714,7 +1830,7 @@ class OptionsFlowHandler(OptionsFlow):
                     }
                     self.config_data[CONF_SOLAR_FORECAST_SENSOR] = forecast_sensor
                     self.config_data["max_contracted_power"] = user_input["max_contracted_power"]
-                    return await self.async_step_weekly_full_charge()
+                    return await self._save_and_finish()
             except Exception as e:
                 _LOGGER.error("Error validating predictive charging config: %s", e)
                 errors["base"] = "unknown"
@@ -1768,7 +1884,7 @@ class OptionsFlowHandler(OptionsFlow):
     ) -> FlowResult:
         """Configure dynamic pricing predictive grid charging in options flow."""
         errors = {}
-        has_global_sensor = bool(self.config_data.get(CONF_SOLAR_FORECAST_SENSOR))
+        has_global_sensor = bool(self.config_entry.data.get(CONF_SOLAR_FORECAST_SENSOR))
         existing_config = self.config_entry.data
 
         if user_input is not None:
@@ -1793,7 +1909,7 @@ class OptionsFlowHandler(OptionsFlow):
                             errors[CONF_PRICE_SENSOR] = "no_price_data"
 
                 if has_global_sensor:
-                    forecast_sensor = self.config_data[CONF_SOLAR_FORECAST_SENSOR]
+                    forecast_sensor = self.config_entry.data[CONF_SOLAR_FORECAST_SENSOR]
                 else:
                     forecast_sensor = user_input.get("solar_forecast_sensor")
                     if forecast_sensor:
@@ -1818,7 +1934,7 @@ class OptionsFlowHandler(OptionsFlow):
                     self.config_data["max_contracted_power"] = user_input["max_contracted_power"]
                     self.config_data[CONF_SOLAR_FORECAST_SENSOR] = forecast_sensor
                     self.config_data["charging_time_slot"] = None
-                    return await self.async_step_weekly_full_charge()
+                    return await self._save_and_finish()
             except Exception as e:
                 _LOGGER.error("Error validating dynamic pricing config: %s", e)
                 errors["base"] = "unknown"
@@ -1873,7 +1989,7 @@ class OptionsFlowHandler(OptionsFlow):
         """Configure real-time price charging mode in options flow."""
         errors = {}
         existing_config = self.config_entry.data
-        has_global_sensor = bool(self.config_data.get(CONF_SOLAR_FORECAST_SENSOR))
+        has_global_sensor = bool(self.config_entry.data.get(CONF_SOLAR_FORECAST_SENSOR))
 
         if user_input is not None:
             try:
@@ -1883,7 +1999,7 @@ class OptionsFlowHandler(OptionsFlow):
                     errors[CONF_PRICE_SENSOR] = "sensor_not_found"
 
                 if has_global_sensor:
-                    forecast_sensor = self.config_data[CONF_SOLAR_FORECAST_SENSOR]
+                    forecast_sensor = self.config_entry.data[CONF_SOLAR_FORECAST_SENSOR]
                 else:
                     forecast_sensor = user_input.get("solar_forecast_sensor")
                     if forecast_sensor:
@@ -1909,7 +2025,7 @@ class OptionsFlowHandler(OptionsFlow):
                     self.config_data["max_contracted_power"] = user_input["max_contracted_power"]
                     self.config_data[CONF_SOLAR_FORECAST_SENSOR] = forecast_sensor
                     self.config_data["charging_time_slot"] = None
-                    return await self.async_step_weekly_full_charge()
+                    return await self._save_and_finish()
             except Exception as e:
                 _LOGGER.error("Error validating real-time price config: %s", e)
                 errors["base"] = "unknown"
@@ -1961,7 +2077,7 @@ class OptionsFlowHandler(OptionsFlow):
             else:
                 self.config_data[CONF_ENABLE_WEEKLY_FULL_CHARGE] = False
                 self.config_data[CONF_WEEKLY_FULL_CHARGE_DAY] = "sun"
-                return await self.async_step_charge_delay()
+                return await self._save_and_finish()
 
         is_weekly_full_charge_enabled = self.config_entry.data.get(CONF_ENABLE_WEEKLY_FULL_CHARGE, False)
 
@@ -1987,7 +2103,7 @@ class OptionsFlowHandler(OptionsFlow):
         if user_input is not None:
             self.config_data[CONF_ENABLE_WEEKLY_FULL_CHARGE] = True
             self.config_data[CONF_WEEKLY_FULL_CHARGE_DAY] = user_input["weekly_full_charge_day"]
-            return await self.async_step_charge_delay()
+            return await self._save_and_finish()
 
         return self.async_show_form(
             step_id="weekly_full_charge_config",
@@ -2014,7 +2130,7 @@ class OptionsFlowHandler(OptionsFlow):
                 return await self.async_step_charge_delay_config()
             else:
                 self.config_data[CONF_ENABLE_CHARGE_DELAY] = False
-                return await self.async_step_capacity_protection()
+                return await self._save_and_finish()
 
         # Backward compat: check old key too
         is_delay_enabled = self.config_entry.data.get(
@@ -2053,7 +2169,7 @@ class OptionsFlowHandler(OptionsFlow):
                     user_input.get("delay_soc_setpoint", current_soc_setpoint)
                 )
 
-            existing_forecast = self.config_data.get(CONF_SOLAR_FORECAST_SENSOR)
+            existing_forecast = self.config_entry.data.get(CONF_SOLAR_FORECAST_SENSOR)
             if not existing_forecast:
                 forecast_sensor = user_input.get("solar_forecast_sensor")
                 if not forecast_sensor:
@@ -2066,9 +2182,9 @@ class OptionsFlowHandler(OptionsFlow):
                         self.config_data[CONF_SOLAR_FORECAST_SENSOR] = forecast_sensor
 
             if not errors:
-                return await self.async_step_capacity_protection()
+                return await self._save_and_finish()
 
-        has_forecast_sensor = bool(self.config_data.get(CONF_SOLAR_FORECAST_SENSOR))
+        has_forecast_sensor = bool(self.config_entry.data.get(CONF_SOLAR_FORECAST_SENSOR))
         schema_dict = {
             vol.Optional("delay_safety_margin_h", default=current_margin / 60):
                 NumberSelector(
@@ -2108,7 +2224,7 @@ class OptionsFlowHandler(OptionsFlow):
                 return await self.async_step_capacity_protection_config()
             else:
                 self.config_data[CONF_CAPACITY_PROTECTION_ENABLED] = False
-                return await self.async_step_pd_advanced()
+                return await self._save_and_finish()
 
         is_enabled = self.config_entry.data.get(CONF_CAPACITY_PROTECTION_ENABLED, False)
 
@@ -2133,7 +2249,7 @@ class OptionsFlowHandler(OptionsFlow):
             self.config_data[CONF_CAPACITY_PROTECTION_ENABLED] = True
             self.config_data[CONF_CAPACITY_PROTECTION_SOC_THRESHOLD] = int(user_input["capacity_protection_soc_threshold"])
             self.config_data[CONF_CAPACITY_PROTECTION_LIMIT] = int(user_input["capacity_protection_limit"])
-            return await self.async_step_pd_advanced()
+            return await self._save_and_finish()
 
         return self.async_show_form(
             step_id="capacity_protection_config",
@@ -2167,7 +2283,6 @@ class OptionsFlowHandler(OptionsFlow):
             if user_input.get("configure_pd_advanced", False):
                 return await self.async_step_pd_advanced_config()
             else:
-                # Use default PD parameters - set them explicitly for backward compatibility
                 self.config_data[CONF_PD_KP] = DEFAULT_PD_KP
                 self.config_data[CONF_PD_KD] = DEFAULT_PD_KD
                 self.config_data[CONF_PD_DEADBAND] = DEFAULT_PD_DEADBAND
@@ -2175,13 +2290,7 @@ class OptionsFlowHandler(OptionsFlow):
                 self.config_data[CONF_PD_DIRECTION_HYSTERESIS] = DEFAULT_PD_DIRECTION_HYSTERESIS
                 self.config_data[CONF_PD_MIN_CHARGE_POWER] = DEFAULT_PD_MIN_CHARGE_POWER
                 self.config_data[CONF_PD_MIN_DISCHARGE_POWER] = DEFAULT_PD_MIN_DISCHARGE_POWER
-
-                # Final step: Update entry and reload
-                self.hass.config_entries.async_update_entry(
-                    self.config_entry, data=self.config_data
-                )
-                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
-                return self.async_create_entry(title="", data={})
+                return await self._save_and_finish()
 
         # Check if PD parameters were previously configured (non-default values)
         has_custom_pd = (
@@ -2220,13 +2329,7 @@ class OptionsFlowHandler(OptionsFlow):
             self.config_data[CONF_PD_DIRECTION_HYSTERESIS] = user_input["pd_direction_hysteresis"]
             self.config_data[CONF_PD_MIN_CHARGE_POWER] = user_input["pd_min_charge_power"]
             self.config_data[CONF_PD_MIN_DISCHARGE_POWER] = user_input["pd_min_discharge_power"]
-
-            # Final step: Update entry and reload
-            self.hass.config_entries.async_update_entry(
-                self.config_entry, data=self.config_data
-            )
-            await self.hass.config_entries.async_reload(self.config_entry.entry_id)
-            return self.async_create_entry(title="", data={})
+            return await self._save_and_finish()
 
         # Load existing configuration with defaults
         existing_config = self.config_entry.data

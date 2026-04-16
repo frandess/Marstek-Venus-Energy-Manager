@@ -257,6 +257,35 @@
           "capacity_protection_soc_threshold": "Lorsque le SOC moyen des batteries descend en dessous de cette valeur, l'écrêtement de pointe s'active. La batterie cessera de décharger pour la consommation normale et ne couvrira que les pointes au-dessus de la limite.",
           "capacity_protection_limit": "Seuil de puissance d'importation réseau. Lorsque la consommation de la maison dépasse cette valeur et que l'écrêtement de pointe est actif, la batterie ne décharge que l'excès au-dessus de cette limite."
         }
+      },
+      "pd_advanced": {
+        "title": "Paramètres avancés du contrôleur PD",
+        "description": "Configurez les paramètres avancés du contrôleur PD pour affiner le comportement de charge/décharge de la batterie. Ne modifiez ces valeurs que si vous comprenez la théorie du contrôle PID. Les valeurs par défaut fonctionnent bien pour la plupart des installations.",
+        "data": {
+          "configure_pd_advanced": "Configurer les paramètres avancés du contrôleur PD"
+        }
+      },
+      "pd_advanced_config": {
+        "title": "Configuration du contrôleur PD",
+        "description": "Ajustez le contrôleur proportionnel-dérivé qui gère les ajustements de puissance de la batterie.",
+        "data": {
+          "pd_kp": "Kp - Gain proportionnel",
+          "pd_kd": "Kd - Gain dérivé",
+          "pd_deadband": "Bande morte (W)",
+          "pd_max_power_change": "Changement de puissance max par cycle (W)",
+          "pd_direction_hysteresis": "Hystérésis de direction (W)",
+          "pd_min_charge_power": "Puissance minimale de charge (W)",
+          "pd_min_discharge_power": "Puissance minimale de décharge (W)"
+        },
+        "data_description": {
+          "pd_kp": "Réactivité au déséquilibre du réseau. Valeurs plus élevées = réponse plus rapide mais risque de dépassement. Plage : 0.1-2.0, par défaut : 0.65",
+          "pd_kd": "Amortissement pour éviter les oscillations. Valeurs plus élevées = transitions plus douces mais stabilisation plus lente. Plage : 0.0-2.0, par défaut : 0.5",
+          "pd_deadband": "Tolérance de puissance du réseau autour de zéro. Empêche les micro-ajustements aux fluctuations mineures. Plage : 0-200W, par défaut : 40W",
+          "pd_max_power_change": "Changement de puissance maximale de la batterie par cycle de contrôle (2.5s). Empêche les commandes abruptes. Plage : 100-2000W, par défaut : 800W",
+          "pd_direction_hysteresis": "Seuil de puissance requis pour basculer entre charge et décharge. Empêche les changements rapides de direction. Plage : 0-200W, par défaut : 60W",
+          "pd_min_charge_power": "Puissance minimale pour charger. En dessous de ce seuil, le contrôleur reste en veille au lieu de charger à faible puissance. 0 = désactivé.",
+          "pd_min_discharge_power": "Puissance minimale pour décharger. En dessous de ce seuil, le contrôleur reste en veille au lieu de décharger à faible puissance. 0 = désactivé."
+        }
       }
     },
     "error": {
@@ -275,7 +304,22 @@
     "step": {
       "init": {
         "title": "Reconfigurer Marstek Venus Energy Manager",
-        "description": "Modifiez la configuration de l'intégration. Les modifications seront appliquées lors du redémarrage de l'intégration.",
+        "description": "Sélectionnez la section que vous souhaitez configurer.",
+        "menu_options": {
+          "sensors": "Capteurs",
+          "batteries": "Batteries",
+          "time_slots": "Créneaux sans décharge",
+          "excluded_devices": "Appareils exclus",
+          "predictive_charging": "Charge prédictive",
+          "weekly_full_charge": "Charge complète hebdomadaire",
+          "charge_delay": "Retard de charge solaire",
+          "capacity_protection": "Protection de capacité",
+          "pd_advanced": "Contrôleur PD (avancé)"
+        }
+      },
+      "sensors": {
+        "title": "Capteurs",
+        "description": "Configurez les capteurs utilisés par l'intégration.",
         "data": {
           "consumption_sensor": "Capteur de consommation réseau",
           "solar_forecast_sensor": "Capteur de prévision solaire (optionnel)",

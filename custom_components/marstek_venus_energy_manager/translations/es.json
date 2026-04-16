@@ -257,6 +257,35 @@
           "capacity_protection_soc_threshold": "Cuando el SOC medio de las baterías baje de este valor, se activa la reducción de picos. La batería dejará de descargar para consumo normal y solo cubrirá picos por encima del límite.",
           "capacity_protection_limit": "Umbral de potencia de importación de red. Cuando el consumo de la casa supere este valor y la reducción de picos esté activa, la batería solo descargará el exceso por encima de este límite."
         }
+      },
+      "pd_advanced": {
+        "title": "Parámetros avanzados del controlador PD",
+        "description": "Configura parámetros avanzados del controlador PD para ajustar el comportamiento de carga/descarga de las baterías. Solo modifica estos valores si comprendes la teoría de control PID. Los valores predeterminados funcionan bien para la mayoría de instalaciones.",
+        "data": {
+          "configure_pd_advanced": "Configurar parámetros avanzados del controlador PD"
+        }
+      },
+      "pd_advanced_config": {
+        "title": "Configuración del controlador PD",
+        "description": "Ajusta el controlador Proporcional-Derivativo que gestiona los cambios de potencia de las baterías.",
+        "data": {
+          "pd_kp": "Kp - Ganancia Proporcional",
+          "pd_kd": "Kd - Ganancia Derivativa",
+          "pd_deadband": "Banda muerta (W)",
+          "pd_max_power_change": "Cambio máximo de potencia por ciclo (W)",
+          "pd_direction_hysteresis": "Histéresis de dirección (W)",
+          "pd_min_charge_power": "Potencia mínima de carga (W)",
+          "pd_min_discharge_power": "Potencia mínima de descarga (W)"
+        },
+        "data_description": {
+          "pd_kp": "Capacidad de respuesta al desequilibrio de red. Valores más altos = respuesta más rápida pero riesgo de sobreoscilación. Rango: 0.1-2.0, predeterminado: 0.65",
+          "pd_kd": "Amortiguación para prevenir oscilaciones. Valores más altos = transiciones más suaves pero asentamiento más lento. Rango: 0.0-2.0, predeterminado: 0.5",
+          "pd_deadband": "Tolerancia de potencia de red alrededor de cero. Previene microajustes ante fluctuaciones menores. Rango: 0-200W, predeterminado: 40W",
+          "pd_max_power_change": "Cambio máximo de potencia de batería por ciclo de control (2.5s). Previene comandos abruptos. Rango: 100-2000W, predeterminado: 800W",
+          "pd_direction_hysteresis": "Umbral de potencia requerido para cambiar entre carga y descarga. Previene cambios rápidos de dirección. Rango: 0-200W, predeterminado: 60W",
+          "pd_min_charge_power": "Potencia mínima para cargar. Por debajo de este umbral, el controlador queda en reposo en vez de cargar a baja potencia. 0 = desactivado.",
+          "pd_min_discharge_power": "Potencia mínima para descargar. Por debajo de este umbral, el controlador queda en reposo en vez de descargar a baja potencia. 0 = desactivado."
+        }
       }
     },
     "error": {
@@ -275,7 +304,22 @@
     "step": {
       "init": {
         "title": "Reconfigurar Marstek Venus Energy Manager",
-        "description": "Modifica la configuración de la integración. Los cambios se aplicarán al reiniciar la integración.",
+        "description": "Selecciona la sección que deseas configurar.",
+        "menu_options": {
+          "sensors": "Sensores",
+          "batteries": "Baterías",
+          "time_slots": "Franjas sin descarga",
+          "excluded_devices": "Dispositivos excluidos",
+          "predictive_charging": "Carga predictiva",
+          "weekly_full_charge": "Carga completa semanal",
+          "charge_delay": "Retraso de carga solar",
+          "capacity_protection": "Protección de capacidad",
+          "pd_advanced": "Controlador PD (avanzado)"
+        }
+      },
+      "sensors": {
+        "title": "Sensores",
+        "description": "Configura los sensores utilizados por la integración.",
         "data": {
           "consumption_sensor": "Sensor de consumo de la red",
           "solar_forecast_sensor": "Sensor de predicción solar (opcional)",

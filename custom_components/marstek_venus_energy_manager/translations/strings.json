@@ -255,6 +255,35 @@
           "capacity_protection_soc_threshold": "When average battery SOC drops below this value, peak shaving activates. The battery will stop discharging for normal consumption and only cover peaks above the limit.",
           "capacity_protection_limit": "Grid import power threshold. When house consumption exceeds this value and peak shaving is active, the battery discharges only the excess above this limit."
         }
+      },
+      "pd_advanced": {
+        "title": "Advanced PD Controller Parameters",
+        "description": "Configure advanced PD controller parameters for expert tuning of battery charge/discharge behavior. Only modify these if you understand PID control theory. Default values work well for most installations.",
+        "data": {
+          "configure_pd_advanced": "Configure advanced PD controller parameters"
+        }
+      },
+      "pd_advanced_config": {
+        "title": "PD Controller Configuration",
+        "description": "Tune the Proportional-Derivative controller that manages battery power adjustments.",
+        "data": {
+          "pd_kp": "Kp - Proportional Gain",
+          "pd_kd": "Kd - Derivative Gain",
+          "pd_deadband": "Deadband (W)",
+          "pd_max_power_change": "Max Power Change per Cycle (W)",
+          "pd_direction_hysteresis": "Direction Hysteresis (W)",
+          "pd_min_charge_power": "Minimum Charge Power (W)",
+          "pd_min_discharge_power": "Minimum Discharge Power (W)"
+        },
+        "data_description": {
+          "pd_kp": "Responsiveness to grid imbalance. Higher values = faster response but risk of overshoot. Range: 0.1-2.0, default: 0.65",
+          "pd_kd": "Damping to prevent oscillation. Higher values = smoother transitions but slower settling. Range: 0.0-2.0, default: 0.5",
+          "pd_deadband": "Grid power tolerance around zero. Prevents micro-adjustments to minor fluctuations. Range: 0-200W, default: 40W",
+          "pd_max_power_change": "Maximum battery power change per control cycle (2.5s). Prevents abrupt commands. Range: 100-2000W, default: 800W",
+          "pd_direction_hysteresis": "Power threshold required to switch between charging and discharging. Prevents rapid direction changes. Range: 0-200W, default: 60W",
+          "pd_min_charge_power": "Minimum power for charging. Below this threshold, the controller stays idle instead of charging at low power. 0 = disabled.",
+          "pd_min_discharge_power": "Minimum power for discharging. Below this threshold, the controller stays idle instead of discharging at low power. 0 = disabled."
+        }
       }
     },
     "error": {
@@ -273,7 +302,22 @@
     "step": {
       "init": {
         "title": "Reconfigure Marstek Venus Energy Manager",
-        "description": "Modify the integration configuration. Changes will be applied when restarting the integration.",
+        "description": "Select which section you want to configure.",
+        "menu_options": {
+          "sensors": "Sensors",
+          "batteries": "Batteries",
+          "time_slots": "No-discharge time slots",
+          "excluded_devices": "Excluded devices",
+          "predictive_charging": "Predictive charging",
+          "weekly_full_charge": "Weekly full charge",
+          "charge_delay": "Solar charge delay",
+          "capacity_protection": "Capacity protection",
+          "pd_advanced": "PD controller (advanced)"
+        }
+      },
+      "sensors": {
+        "title": "Sensors",
+        "description": "Configure the sensors used by the integration.",
         "data": {
           "consumption_sensor": "Grid consumption sensor",
           "solar_forecast_sensor": "Solar forecast sensor (optional)",
