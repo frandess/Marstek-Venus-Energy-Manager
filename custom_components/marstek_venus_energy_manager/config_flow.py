@@ -1316,9 +1316,9 @@ class OptionsFlowHandler(OptionsFlow):
                         EntitySelector(EntitySelectorConfig(domain="sensor")),
                     vol.Optional(CONF_METER_INVERTED, default=current_inverted):
                         BooleanSelector(),
-                    vol.Optional(CONF_SOLAR_FORECAST_SENSOR, default=current_forecast if current_forecast else vol.UNDEFINED):
+                    vol.Optional(CONF_SOLAR_FORECAST_SENSOR, description={"suggested_value": current_forecast} if current_forecast else {}):
                         EntitySelector(EntitySelectorConfig(domain="sensor")),
-                    vol.Optional(CONF_HOUSEHOLD_CONSUMPTION_SENSOR, default=current_household if current_household else vol.UNDEFINED):
+                    vol.Optional(CONF_HOUSEHOLD_CONSUMPTION_SENSOR, description={"suggested_value": current_household} if current_household else {}):
                         EntitySelector(EntitySelectorConfig(domain="sensor")),
                 }
             ),
@@ -1883,7 +1883,7 @@ class OptionsFlowHandler(OptionsFlow):
                 ),
         }
         if not has_global_sensor:
-            schema_dict[vol.Optional("solar_forecast_sensor", default=defaults["sensor"] if defaults["sensor"] else vol.UNDEFINED)] = EntitySelector(
+            schema_dict[vol.Optional("solar_forecast_sensor", description={"suggested_value": defaults["sensor"]} if defaults["sensor"] else {})] = EntitySelector(
                 EntitySelectorConfig(domain="sensor")
             )
         schema_dict[vol.Required("max_contracted_power", default=defaults["power"])] = NumberSelector(
@@ -1993,7 +1993,7 @@ class OptionsFlowHandler(OptionsFlow):
         if not has_global_sensor:
             schema_dict[vol.Optional(
                 "solar_forecast_sensor",
-                default=default_forecast if default_forecast else vol.UNDEFINED
+                description={"suggested_value": default_forecast} if default_forecast else {}
             )] = EntitySelector(EntitySelectorConfig(domain="sensor"))
         schema_dict[vol.Required("max_contracted_power", default=default_power)] = NumberSelector(
             NumberSelectorConfig(min=1000, max=15000, step=100, mode=NumberSelectorMode.BOX)
@@ -2074,7 +2074,7 @@ class OptionsFlowHandler(OptionsFlow):
                 TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT)),
             vol.Optional(
                 CONF_AVERAGE_PRICE_SENSOR,
-                default=default_avg_sensor if default_avg_sensor else vol.UNDEFINED
+                description={"suggested_value": default_avg_sensor} if default_avg_sensor else {}
             ):
                 EntitySelector(EntitySelectorConfig(domain="sensor")),
             vol.Required(CONF_RT_PRICE_DISCHARGE_CONTROL, default=default_rt_discharge_control): bool,
@@ -2082,7 +2082,7 @@ class OptionsFlowHandler(OptionsFlow):
         if not has_global_sensor:
             schema_dict[vol.Optional(
                 "solar_forecast_sensor",
-                default=default_forecast if default_forecast else vol.UNDEFINED
+                description={"suggested_value": default_forecast} if default_forecast else {}
             )] = EntitySelector(EntitySelectorConfig(domain="sensor"))
         schema_dict[vol.Required("max_contracted_power", default=default_power)] = NumberSelector(
             NumberSelectorConfig(min=1000, max=15000, step=100, mode=NumberSelectorMode.BOX)
