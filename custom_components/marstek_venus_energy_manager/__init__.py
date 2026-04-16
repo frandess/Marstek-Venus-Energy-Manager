@@ -81,6 +81,8 @@ from .const import (
     PRICE_INTEGRATION_PVPC,
     PRICE_INTEGRATION_CKW,
     CONF_METER_INVERTED,
+    CONF_PREDICTIVE_SAFETY_MARGIN_KWH,
+    DEFAULT_PREDICTIVE_SAFETY_MARGIN_KWH,
 )
 from .coordinator import MarstekVenusDataUpdateCoordinator
 
@@ -278,6 +280,7 @@ class ChargeDischargeController:
         self._delay_safety_margin_h = config_entry.data.get(CONF_DELAY_SAFETY_MARGIN_MIN, DEFAULT_DELAY_SAFETY_MARGIN_MIN) / 60.0
         self._delay_soc_setpoint_enabled = config_entry.data.get(CONF_DELAY_SOC_SETPOINT_ENABLED, DEFAULT_DELAY_SOC_SETPOINT_ENABLED)
         self._delay_soc_setpoint = config_entry.data.get(CONF_DELAY_SOC_SETPOINT, DEFAULT_DELAY_SOC_SETPOINT)
+        self._predictive_safety_margin_kwh: float = config_entry.data.get(CONF_PREDICTIVE_SAFETY_MARGIN_KWH, DEFAULT_PREDICTIVE_SAFETY_MARGIN_KWH)
         self._charge_delay_unlocked = False       # True when delay has been unlocked today
         self._charge_delay_last_date = None       # For daily reset
         self._charge_delay_forecast_cache = None  # Last forecast value used for balance check
@@ -354,6 +357,7 @@ class ChargeDischargeController:
         self._charge_delay_status["safety_margin_min"] = int(self._delay_safety_margin_h * 60)
         self._delay_soc_setpoint_enabled = self.config_entry.data.get(CONF_DELAY_SOC_SETPOINT_ENABLED, DEFAULT_DELAY_SOC_SETPOINT_ENABLED)
         self._delay_soc_setpoint = self.config_entry.data.get(CONF_DELAY_SOC_SETPOINT, DEFAULT_DELAY_SOC_SETPOINT)
+        self._predictive_safety_margin_kwh = self.config_entry.data.get(CONF_PREDICTIVE_SAFETY_MARGIN_KWH, DEFAULT_PREDICTIVE_SAFETY_MARGIN_KWH)
         self._charge_delay_status["soc_setpoint"] = self._delay_soc_setpoint if self._delay_soc_setpoint_enabled else None
         self.charge_delay_enabled = self.config_entry.data.get(
             CONF_ENABLE_CHARGE_DELAY,
@@ -2220,6 +2224,10 @@ class ChargeDischargeController:
         min_reserve_kwh = usable_energy_kwh  # Dynamic buffer: 0 at cutoff, positive above
         effective_min_soc = min_soc  # Actual hardware cutoff, no safety margin
 
+        # Safety margin: user-configurable buffer added to consumption forecast.
+        # Guardrail: never exceed total system capacity.
+        safety_margin_kwh = min(self._predictive_safety_margin_kwh, total_capacity_kwh)
+
         # Get dynamic consumption forecast
         avg_consumption_kwh = await self._get_dynamic_base_consumption()
         days_in_history = len(self._daily_consumption_history)
@@ -2231,7 +2239,7 @@ class ChargeDischargeController:
         if forecast_state is None or forecast_state.state in ("unknown", "unavailable"):
             # Conservative mode: assume zero solar, compare usable vs consumption
             total_available_kwh = usable_energy_kwh
-            energy_deficit_kwh = avg_consumption_kwh - total_available_kwh
+            energy_deficit_kwh = avg_consumption_kwh + safety_margin_kwh - total_available_kwh
             should_charge = energy_deficit_kwh > 0
 
             _LOGGER.warning(
@@ -2266,7 +2274,7 @@ class ChargeDischargeController:
         except (ValueError, TypeError):
             # Treat invalid as unavailable - use same conservative logic
             total_available_kwh = usable_energy_kwh
-            energy_deficit_kwh = avg_consumption_kwh - total_available_kwh
+            energy_deficit_kwh = avg_consumption_kwh + safety_margin_kwh - total_available_kwh
             should_charge = energy_deficit_kwh > 0
 
             _LOGGER.error(
@@ -2298,7 +2306,7 @@ class ChargeDischargeController:
 
         # === STEP 6: Calculate Energy Balance and Decide ===
         total_available_kwh = usable_energy_kwh + solar_forecast_kwh
-        energy_deficit_kwh = avg_consumption_kwh - total_available_kwh
+        energy_deficit_kwh = avg_consumption_kwh + safety_margin_kwh - total_available_kwh
         should_charge = energy_deficit_kwh > 0
 
         _LOGGER.info(
@@ -2311,8 +2319,9 @@ class ChargeDischargeController:
             "  Energy Balance:\n"
             "    - Solar forecast: %.2f kWh\n"
             "    - Consumption forecast: %.2f kWh (%d-day avg)\n"
+            "    - Safety margin: %.2f kWh\n"
             "    - Total available: %.2f kWh (usable + solar)\n"
-            "    - Energy deficit: %.2f kWh\n"
+            "    - Energy deficit: %.2f kWh (consumption + margin - available)\n"
             "  → Decision: %s",
             total_capacity_kwh,
             avg_soc, stored_energy_kwh,
@@ -2320,6 +2329,7 @@ class ChargeDischargeController:
             usable_energy_kwh,
             solar_forecast_kwh,
             avg_consumption_kwh, days_in_history,
+            safety_margin_kwh,
             total_available_kwh,
             energy_deficit_kwh,
             "ACTIVATE CHARGING" if should_charge else "NO CHARGING NEEDED"
@@ -2342,10 +2352,12 @@ class ChargeDischargeController:
             "consumption_source": "household_sensor" if self.household_consumption_sensor else "battery_discharge",
             "reason": (
                 f"Energy deficit: {energy_deficit_kwh:.2f} kWh "
-                f"(available: {total_available_kwh:.2f} kWh < consumption: {avg_consumption_kwh:.2f} kWh)"
+                f"(available: {total_available_kwh:.2f} kWh < consumption: {avg_consumption_kwh:.2f} kWh"
+                + (f" + margin: {safety_margin_kwh:.2f} kWh" if safety_margin_kwh > 0 else "") + ")"
                 if should_charge else
                 f"Sufficient energy: {total_available_kwh:.2f} kWh available "
                 f"≥ {avg_consumption_kwh:.2f} kWh consumption"
+                + (f" + {safety_margin_kwh:.2f} kWh margin" if safety_margin_kwh > 0 else "")
             )
         }
 
