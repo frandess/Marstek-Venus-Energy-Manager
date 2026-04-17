@@ -3113,8 +3113,7 @@ class ChargeDischargeController:
                         start = dt_util.as_local(start).replace(tzinfo=None)
                     if hasattr(end, "tzinfo") and end.tzinfo is not None:
                         end = dt_util.as_local(end).replace(tzinfo=None)
-                    # Nordpool reports values in ct/kWh — convert to €/kWh
-                    slots.append(PriceSlot(start=start, end=end, price=float(value) / 100.0))
+                    slots.append(PriceSlot(start=start, end=end, price=float(value)))
                 except Exception as exc:
                     _LOGGER.debug("Dynamic pricing: failed to parse Nordpool entry %s: %s", entry, exc)
         return slots
@@ -3182,12 +3181,7 @@ class ChargeDischargeController:
         return slots
 
     def _get_price_unit(self) -> str:
-        """Return the price unit label for the configured integration.
-
-        Nordpool and CKW sensors expose prices in sub-units (ct/kWh and Rp/kWh
-        respectively). We keep the values as-is and label them with the correct
-        unit so notifications and thresholds match what users see in the sensor.
-        """
+        """Return the price unit label for the configured integration."""
         if self.price_integration_type == PRICE_INTEGRATION_CKW:
             return "Rp/kWh"
         return "€/kWh"

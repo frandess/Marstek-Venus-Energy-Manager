@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.6.7] - 2026-04-17
+
+### Fixed
+- **Dynamic pricing: Nordpool prices off by factor 100**: The Nordpool price parser was dividing sensor values by 100, based on a wrong assumption that the integration reports in ct/kWh. The Nordpool integration reports directly in €/kWh (e.g. 0.072), so the stored slot prices were 100× too small (0.00072). This caused cheapest-slot selection to be correct (relative order unchanged) but made the `max_price_threshold` filter never trigger, and broke the price-based discharge control — which compares the live sensor price (€/kWh scale) against the daily average computed from slots (was ct/kWh scale). Fixed by removing the division.
+
 ## [1.6.6] - 2026-04-16
 
 ### Added
