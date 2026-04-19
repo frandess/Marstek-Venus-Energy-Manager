@@ -754,6 +754,7 @@
       "vms_version": { "name": "VMS-versie" },
       "comm_module_firmware": { "name": "Firmware Communicatiemodule" },
       "mac_address": { "name": "MAC-adres" },
+      "wifi_signal_strength": { "name": "WiFi-signaalsterkte" },
       "battery_cycle_count": { "name": "Batterijcycli" },
       "battery_cycle_count_calc": { "name": "Batterijcycli (Berekend)" }
     },
@@ -765,7 +766,14 @@
     },
     "select": {
       "force_mode": { "name": "Geforceerde Modus" },
-      "user_work_mode": { "name": "Werkmodus" },
+      "user_work_mode": {
+        "name": "Werkmodus",
+        "state": {
+          "manual": "Handmatig",
+          "anti_feed": "Eigen verbruik",
+          "trade_mode": "AI-optimalisatie"
+        }
+      },
       "weekly_full_charge_day": {
         "name": "Dag voor Wekelijkse Volledige Lading",
         "state": {

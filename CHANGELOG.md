@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.6.7] - 2026-04-19
+
+### Added
+- **WiFi Signal Strength sensor**: New diagnostic sensor (register 30303, dBm) available for all battery versions. Disabled by default.
+- **User Work Mode select**: New select entity (register 43000) available for all battery versions, with options `Manual`, `Self Consumption` (anti feed-in), and `AI Optimization` (trade mode). Disabled by default. Fully translated into EN, ES, DE, FR, and NL.
+
+### Fixed
+- **`enabled_by_default: false` was ignored**: Modbus register entities (sensor, select, binary sensor, switch, number, button) did not propagate the `enabled_by_default` flag from their definition to the HA entity registry. All Modbus entity classes now set `_attr_entity_registry_enabled_default` from the definition, so entities marked `enabled_by_default: false` are correctly disabled in the registry for new installations.
+- **User Work Mode displayed wrong option due to battery firmware bug**: The battery's Modbus register for user work mode returns an incorrect value on readback. The integration now uses a persistent shadow state — the last value written is stored in config entry data and used for display instead of the polled register value. The shadow survives HA restarts. The register is still written correctly so the battery operates in the selected mode.
+
 ## [1.6.6] - 2026-04-16
 
 ### Added
