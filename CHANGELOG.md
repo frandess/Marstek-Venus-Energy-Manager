@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.7] - 2026-04-20
+
+### Added
+- **Disable charge delay on full charge day**: New checkbox in the weekly full charge configuration step ("Disable charge delay on full charge day"). When enabled, the solar charge delay is bypassed entirely on the weekly full charge day — charging starts immediately without waiting for the solar balance to unlock it. Staying at 100 % for longer helps balance the battery cells. Available in both the initial setup wizard and the options flow. Disabled by default (existing behaviour is preserved).
+
+### Fixed
+- **v3 batteries: weekly full charge interrupted after HA restart when charge delay was enabled**: After a Home Assistant restart on the weekly full charge day, `_charge_delay_unlocked` was correctly restored from persistent storage but was then immediately overwritten to `False` by the daily-reset block, because `_charge_delay_last_date` is an in-memory variable that always starts as `None` after a restart. For v2 batteries this had no visible effect (the hardware cutoff register at 100 % remained set regardless of software state), but for v3 batteries the software-enforced `effective_max_soc` dropped back to the user's configured limit, stopping the charge mid-way. Fixed by only resetting `_charge_delay_unlocked` on a genuine day change (`_charge_delay_last_date is not None`); on the first cycle after a restart the restored value from storage is preserved.
+
 ## [1.6.6] - 2026-04-16
 
 ### Added
