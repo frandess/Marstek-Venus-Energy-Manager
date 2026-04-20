@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.6.7] - 2026-04-20
+
+### Fixed
+- **Excluded devices not subtracted from household consumption history**: The daily household energy accumulator (used by predictive grid charging to estimate typical consumption) integrated the raw household consumption sensor reading without accounting for excluded devices. Devices marked as *included in consumption sensor* (i.e. the home sensor sees them, but the battery is configured to ignore them) were counted toward the consumption the battery was expected to cover, causing predictive charging to overestimate demand and charge from the grid unnecessarily. Fixed by applying the same per-device correction at accumulation time: power from `included_in_consumption=True` devices is subtracted from the reading and power from `included_in_consumption=False` devices (not visible to the home sensor but covered by the battery) is added. The same correction is now applied in the historical backfill path (`_backfill_household_from_history`), which queries each excluded device's recorder history for past days and adjusts the integrated value accordingly — so consumption history populated after a restart is also accurate.
+
 ## [1.6.6] - 2026-04-16
 
 ### Added

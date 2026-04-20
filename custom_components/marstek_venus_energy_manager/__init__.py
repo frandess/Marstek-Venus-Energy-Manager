@@ -1918,6 +1918,65 @@ class ChargeDischargeController:
             prev_ts = ts
             prev_kw = power_kw
 
+        # Apply excluded-device adjustment using historical power data for each device.
+        # Mirrors the real-time logic in _excluded_devices_consumption_delta_kw():
+        #   included_in_consumption=True  → device is in home sensor but battery skips it → subtract
+        #   included_in_consumption=False → device not in home sensor but battery covers it → add
+        excluded_devices = self.config_entry.data.get("excluded_devices", [])
+        for device in excluded_devices:
+            if device.get("ev_charger_no_telemetry", False):
+                continue
+            power_sensor = device.get("power_sensor")
+            if not power_sensor:
+                continue
+            try:
+                dev_states_map = await recorder_instance.async_add_executor_job(
+                    history.state_changes_during_period,
+                    self.hass,
+                    start_time,
+                    end_time,
+                    power_sensor,
+                )
+            except Exception as e:
+                _LOGGER.debug("Excluded device backfill query failed for %s on %s: %s", power_sensor, target_date, e)
+                continue
+
+            dev_states = dev_states_map.get(power_sensor, [])
+            if not dev_states:
+                continue
+
+            dev_kwh = 0.0
+            prev_ts = None
+            prev_kw = None
+            for dev_state in dev_states:
+                if dev_state.state in ('unknown', 'unavailable'):
+                    prev_ts = None
+                    prev_kw = None
+                    continue
+                try:
+                    dev_w = float(dev_state.state)
+                except (ValueError, TypeError):
+                    prev_ts = None
+                    prev_kw = None
+                    continue
+                dev_unit = dev_state.attributes.get("unit_of_measurement", "W")
+                dev_kw = dev_w / 1000.0 if dev_unit == "W" else dev_w
+                ts = dev_state.last_updated
+                if prev_ts is not None and prev_kw is not None:
+                    mid_ts = prev_ts + (ts - prev_ts) / 2
+                    if _in_consumption_window(mid_ts):
+                        dt_hours = (ts - prev_ts).total_seconds() / 3600.0
+                        dev_kwh += max(0.0, prev_kw) * dt_hours
+                prev_ts = ts
+                prev_kw = dev_kw
+
+            if device.get("included_in_consumption", True):
+                energy_kwh -= dev_kwh
+            else:
+                energy_kwh += dev_kwh
+
+        energy_kwh = max(0.0, energy_kwh)
+
         if energy_kwh <= 0:
             _LOGGER.debug("Household backfill for %s: no energy accumulated", target_date)
             return None
@@ -2474,6 +2533,43 @@ class ChargeDischargeController:
 
         return not self._check_time_window()
 
+    def _excluded_devices_consumption_delta_kw(self) -> float:
+        """Net kW correction to apply to the home sensor for excluded-device accounting.
+
+        Returns a value to ADD to the raw home sensor reading so the accumulator
+        reflects only the load the battery is expected to cover:
+          - included_in_consumption=True  → device IS in home sensor but battery skips it → subtract
+          - included_in_consumption=False → device NOT in home sensor but battery covers it → add
+        ev_charger_no_telemetry devices are skipped (no numeric power sensor).
+        Unavailable sensors are silently ignored.
+        """
+        excluded_devices = self.config_entry.data.get("excluded_devices", [])
+        if not excluded_devices:
+            return 0.0
+
+        delta = 0.0
+        for device in excluded_devices:
+            if device.get("ev_charger_no_telemetry", False):
+                continue
+            power_sensor = device.get("power_sensor")
+            if not power_sensor:
+                continue
+            state = self.hass.states.get(power_sensor)
+            if state is None or state.state in ("unknown", "unavailable"):
+                continue
+            try:
+                power_w = float(state.state)
+            except (ValueError, TypeError):
+                continue
+            unit = state.attributes.get("unit_of_measurement", "W")
+            device_kw = power_w / 1000.0 if unit == "W" else power_w
+            if device.get("included_in_consumption", True):
+                delta -= device_kw
+            else:
+                delta += device_kw
+
+        return delta
+
     async def _accumulate_household_consumption(self) -> None:
         """Integrate household power sensor → kWh accumulator (called every control cycle).
 
@@ -2506,6 +2602,10 @@ class ChargeDischargeController:
 
         unit = state.attributes.get("unit_of_measurement", "W")
         power_kw = power_w / 1000.0 if unit == "W" else power_w
+
+        # Adjust for excluded devices: remove power the battery doesn't cover and
+        # add power the battery covers that isn't visible to the home sensor.
+        power_kw += self._excluded_devices_consumption_delta_kw()
 
         now = monotonic()
         if self._household_last_accumulation_time is not None:
