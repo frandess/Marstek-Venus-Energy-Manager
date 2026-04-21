@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.7.0] - 2026-04-20
+
+### Added
+- **Cell balance monitor**: New optional feature (enabled in the weekly full charge configuration step) that tracks the voltage spread between the strongest and weakest cell after each weekly full charge. When enabled, the battery is held at rest for 15 minutes after reaching 100 % SOC so the cell voltages can settle to their true open-circuit values; then a formal reading is taken. Thresholds are fixed at 50 / 100 / 150 mV (green / yellow → orange / red). An orange reading triggers an additional 2.5-hour passive balancing hold before a follow-up reading; red on two consecutive full charges fires a "possible degraded cell" alert.
+- **Opportunistic readings**: Outside the weekly full charge day, if the battery reaches 100 % SOC and power is already below 50 W, a lightweight reading is taken without holding discharge — useful on days with heavy solar generation. Limited to once every 24 hours.
+- **Five new sensor entities per battery**: `Cell Voltage Delta (mV)`, `Balance Status` (green / yellow / orange / red), `Delta Trend` (rising / stable / falling), `Last Balance Read` (timestamp), and `4-Week Average Delta (mV)`. Values are restored from persistent storage on HA restart.
+- **Rising-trend notification**: If the 4-week rolling average of formal readings exceeds 75 mV and the trend is rising, a persistent notification is sent to prompt the user to monitor battery health.
+- **Discharge blocking during OCV wait**: While waiting for the cell voltages to settle, the battery is prevented from discharging so that the reading reflects true open-circuit conditions. Discharge resumes automatically once the reading is complete (or after the 2.5-hour orange hold).
+- **Balance history persistence**: All readings (formal, follow-up, opportunistic) are stored in a per-entry JSON store and survive HA restarts and reloads.
+
+### Changed
+- **"Disable charge delay on full charge day" replaced by "Enable balance monitor"**: The checkbox in the weekly full charge configuration step (initial wizard and options flow) now enables the full cell balance monitoring feature. Enabling it continues to bypass the solar charge delay on the weekly full charge day — keeping the battery in float while solar is available — and additionally activates the balance monitoring state machine described above. Existing configurations that had the old option enabled will need to re-enable via the options flow after upgrading.
+
 ## [1.6.7] - 2026-04-20
 
 ### Added
