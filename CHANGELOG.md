@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.7.0] - 2026-04-21
+
+### Fixed
+- **Predictive charging starts despite switch being off (time slot mode)**: When the predictive charging switch was turned off during an active time slot, charging stopped correctly. However, when the slot ended, the override flag was silently reset to `False` in memory — so on the next slot cycle the switch appeared on again and charging started. The auto-reset on slot exit has been removed; the override now persists until the user explicitly turns the switch back on.
+- **Predictive charging starts despite switch being off (real-time price mode)**: The real-time price handler never consulted `predictive_charging_overridden` before activating charging. If the price dropped below the threshold while the switch was off, charging would start regardless. The handler now checks the override at the top of every cycle and stops any active charging immediately if it is set.
+
 ## [1.6.7] - 2026-04-20
 
 ### Added

@@ -4209,6 +4209,16 @@ class ChargeDischargeController:
             _LOGGER.debug("Real-time price: no threshold configured, skipping")
             return
 
+        # Override active — stop any active charging and do not start new
+        if self.predictive_charging_overridden:
+            if self._realtime_price_charging or self.grid_charging_active:
+                self._realtime_price_charging = False
+                self.grid_charging_active = False
+                self._grid_charging_initialized = False
+                self.previous_power = 0
+                self.previous_error = 0
+            return
+
         price_is_cheap = current_price <= threshold
         _LOGGER.debug(
             "Real-time price: current=%.4f threshold=%.4f cheap=%s charging=%s",
@@ -4339,9 +4349,6 @@ class ChargeDischargeController:
                     "dismiss",
                     {"notification_id": "predictive_charging_evaluation"},
                 )
-
-            if self.predictive_charging_overridden:
-                self.predictive_charging_overridden = False
 
             self._slot_entry_time = None
 
