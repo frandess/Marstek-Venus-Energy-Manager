@@ -1935,6 +1935,65 @@ class ChargeDischargeController:
             prev_ts = ts
             prev_kw = power_kw
 
+        # Apply excluded-device adjustment using historical power data for each device.
+        # Mirrors the real-time logic in _excluded_devices_consumption_delta_kw():
+        #   included_in_consumption=True  → device is in home sensor but battery skips it → subtract
+        #   included_in_consumption=False → device not in home sensor but battery covers it → add
+        excluded_devices = self.config_entry.data.get("excluded_devices", [])
+        for device in excluded_devices:
+            if device.get("ev_charger_no_telemetry", False):
+                continue
+            power_sensor = device.get("power_sensor")
+            if not power_sensor:
+                continue
+            try:
+                dev_states_map = await recorder_instance.async_add_executor_job(
+                    history.state_changes_during_period,
+                    self.hass,
+                    start_time,
+                    end_time,
+                    power_sensor,
+                )
+            except Exception as e:
+                _LOGGER.debug("Excluded device backfill query failed for %s on %s: %s", power_sensor, target_date, e)
+                continue
+
+            dev_states = dev_states_map.get(power_sensor, [])
+            if not dev_states:
+                continue
+
+            dev_kwh = 0.0
+            prev_ts = None
+            prev_kw = None
+            for dev_state in dev_states:
+                if dev_state.state in ('unknown', 'unavailable'):
+                    prev_ts = None
+                    prev_kw = None
+                    continue
+                try:
+                    dev_w = float(dev_state.state)
+                except (ValueError, TypeError):
+                    prev_ts = None
+                    prev_kw = None
+                    continue
+                dev_unit = dev_state.attributes.get("unit_of_measurement", "W")
+                dev_kw = dev_w / 1000.0 if dev_unit == "W" else dev_w
+                ts = dev_state.last_updated
+                if prev_ts is not None and prev_kw is not None:
+                    mid_ts = prev_ts + (ts - prev_ts) / 2
+                    if _in_consumption_window(mid_ts):
+                        dt_hours = (ts - prev_ts).total_seconds() / 3600.0
+                        dev_kwh += max(0.0, prev_kw) * dt_hours
+                prev_ts = ts
+                prev_kw = dev_kw
+
+            if device.get("included_in_consumption", True):
+                energy_kwh -= dev_kwh
+            else:
+                energy_kwh += dev_kwh
+
+        energy_kwh = max(0.0, energy_kwh)
+
         if energy_kwh <= 0:
             _LOGGER.debug("Household backfill for %s: no energy accumulated", target_date)
             return None
@@ -2491,6 +2550,43 @@ class ChargeDischargeController:
 
         return not self._check_time_window()
 
+    def _excluded_devices_consumption_delta_kw(self) -> float:
+        """Net kW correction to apply to the home sensor for excluded-device accounting.
+
+        Returns a value to ADD to the raw home sensor reading so the accumulator
+        reflects only the load the battery is expected to cover:
+          - included_in_consumption=True  → device IS in home sensor but battery skips it → subtract
+          - included_in_consumption=False → device NOT in home sensor but battery covers it → add
+        ev_charger_no_telemetry devices are skipped (no numeric power sensor).
+        Unavailable sensors are silently ignored.
+        """
+        excluded_devices = self.config_entry.data.get("excluded_devices", [])
+        if not excluded_devices:
+            return 0.0
+
+        delta = 0.0
+        for device in excluded_devices:
+            if device.get("ev_charger_no_telemetry", False):
+                continue
+            power_sensor = device.get("power_sensor")
+            if not power_sensor:
+                continue
+            state = self.hass.states.get(power_sensor)
+            if state is None or state.state in ("unknown", "unavailable"):
+                continue
+            try:
+                power_w = float(state.state)
+            except (ValueError, TypeError):
+                continue
+            unit = state.attributes.get("unit_of_measurement", "W")
+            device_kw = power_w / 1000.0 if unit == "W" else power_w
+            if device.get("included_in_consumption", True):
+                delta -= device_kw
+            else:
+                delta += device_kw
+
+        return delta
+
     async def _accumulate_household_consumption(self) -> None:
         """Integrate household power sensor → kWh accumulator (called every control cycle).
 
@@ -2523,6 +2619,10 @@ class ChargeDischargeController:
 
         unit = state.attributes.get("unit_of_measurement", "W")
         power_kw = power_w / 1000.0 if unit == "W" else power_w
+
+        # Adjust for excluded devices: remove power the battery doesn't cover and
+        # add power the battery covers that isn't visible to the home sensor.
+        power_kw += self._excluded_devices_consumption_delta_kw()
 
         now = monotonic()
         if self._household_last_accumulation_time is not None:
@@ -3135,8 +3235,7 @@ class ChargeDischargeController:
                         start = dt_util.as_local(start).replace(tzinfo=None)
                     if hasattr(end, "tzinfo") and end.tzinfo is not None:
                         end = dt_util.as_local(end).replace(tzinfo=None)
-                    # Nordpool reports values in ct/kWh — convert to €/kWh
-                    slots.append(PriceSlot(start=start, end=end, price=float(value) / 100.0))
+                    slots.append(PriceSlot(start=start, end=end, price=float(value)))
                 except Exception as exc:
                     _LOGGER.debug("Dynamic pricing: failed to parse Nordpool entry %s: %s", entry, exc)
         return slots
@@ -3204,12 +3303,7 @@ class ChargeDischargeController:
         return slots
 
     def _get_price_unit(self) -> str:
-        """Return the price unit label for the configured integration.
-
-        Nordpool and CKW sensors expose prices in sub-units (ct/kWh and Rp/kWh
-        respectively). We keep the values as-is and label them with the correct
-        unit so notifications and thresholds match what users see in the sensor.
-        """
+        """Return the price unit label for the configured integration."""
         if self.price_integration_type == PRICE_INTEGRATION_CKW:
             return "Rp/kWh"
         return "€/kWh"
@@ -4215,6 +4309,16 @@ class ChargeDischargeController:
             _LOGGER.debug("Real-time price: no threshold configured, skipping")
             return
 
+        # Override active — stop any active charging and do not start new
+        if self.predictive_charging_overridden:
+            if self._realtime_price_charging or self.grid_charging_active:
+                self._realtime_price_charging = False
+                self.grid_charging_active = False
+                self._grid_charging_initialized = False
+                self.previous_power = 0
+                self.previous_error = 0
+            return
+
         price_is_cheap = current_price <= threshold
         _LOGGER.debug(
             "Real-time price: current=%.4f threshold=%.4f cheap=%s charging=%s",
@@ -4345,9 +4449,6 @@ class ChargeDischargeController:
                     "dismiss",
                     {"notification_id": "predictive_charging_evaluation"},
                 )
-
-            if self.predictive_charging_overridden:
-                self.predictive_charging_overridden = False
 
             self._slot_entry_time = None
 
@@ -5152,6 +5253,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # Restore persisted RS485 user preference and store entry reference for future persistence
         coordinator._config_entry = entry
         coordinator.rs485_user_disabled = battery_config.get("rs485_user_disabled", False)
+        coordinator._shadow_selects = {
+            k[len("shadow_select_"):]: v
+            for k, v in battery_config.items()
+            if k.startswith("shadow_select_")
+        }
 
         # Connect and fetch initial data
         try:

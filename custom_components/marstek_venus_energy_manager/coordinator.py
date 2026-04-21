@@ -258,6 +258,15 @@ class MarstekVenusDataUpdateCoordinator(DataUpdateCoordinator):
         new_data["batteries"] = batteries
         self.hass.config_entries.async_update_entry(self._config_entry, data=new_data)
 
+    def set_shadow_select(self, key: str, value: int) -> None:
+        """Store a written select value to override buggy register readbacks."""
+        self._shadow_selects[key] = value
+        self.persist_battery_config(f"shadow_select_{key}", value)
+
+    def get_shadow_select(self, key: str) -> int | None:
+        """Return the last-written value for a shadowed select, or None."""
+        return self._shadow_selects.get(key)
+
     def get_register(self, key: str) -> int | None:
         """Get register address for this battery's version.
 
