@@ -758,6 +758,7 @@
       "vms_version": { "name": "Versión VMS" },
       "comm_module_firmware": { "name": "Firmware Módulo Comunicación" },
       "mac_address": { "name": "Dirección MAC" },
+      "wifi_signal_strength": { "name": "Intensidad de Señal WiFi" },
       "battery_cycle_count": { "name": "Ciclos de la Batería" },
       "battery_cycle_count_calc": { "name": "Ciclos de la Batería (Calculado)" }
     },
@@ -769,7 +770,14 @@
     },
     "select": {
       "force_mode": { "name": "Modo Forzado" },
-      "user_work_mode": { "name": "Modo de Trabajo" },
+      "user_work_mode": {
+        "name": "Modo de Trabajo",
+        "state": {
+          "manual": "Manual",
+          "anti_feed": "Consumo propio",
+          "trade_mode": "Optimización de la IA"
+        }
+      },
       "weekly_full_charge_day": {
         "name": "Día de Carga Completa Semanal",
         "state": {

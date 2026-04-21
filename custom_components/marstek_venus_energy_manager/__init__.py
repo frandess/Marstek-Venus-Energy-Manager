@@ -5146,6 +5146,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # Restore persisted RS485 user preference and store entry reference for future persistence
         coordinator._config_entry = entry
         coordinator.rs485_user_disabled = battery_config.get("rs485_user_disabled", False)
+        coordinator._shadow_selects = {
+            k[len("shadow_select_"):]: v
+            for k, v in battery_config.items()
+            if k.startswith("shadow_select_")
+        }
 
         # Connect and fetch initial data
         try:

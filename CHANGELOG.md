@@ -1,17 +1,16 @@
 # Changelog
 
-## [1.7.0] - 2026-04-21
-
-### Fixed
-- **Predictive charging starts despite switch being off (time slot mode)**: When the predictive charging switch was turned off during an active time slot, charging stopped correctly. However, when the slot ended, the override flag was silently reset to `False` in memory — so on the next slot cycle the switch appeared on again and charging started. The auto-reset on slot exit has been removed; the override now persists until the user explicitly turns the switch back on.
-- **Predictive charging starts despite switch being off (real-time price mode)**: The real-time price handler never consulted `predictive_charging_overridden` before activating charging. If the price dropped below the threshold while the switch was off, charging would start regardless. The handler now checks the override at the top of every cycle and stops any active charging immediately if it is set.
-
-## [1.6.7] - 2026-04-20
+## [1.7.0b1] - 2026-04-21
 
 ### Added
-- **Disable charge delay on full charge day**: New checkbox in the weekly full charge configuration step ("Disable charge delay on full charge day"). When enabled, the solar charge delay is bypassed entirely on the weekly full charge day — charging starts immediately without waiting for the solar balance to unlock it. Staying at 100 % for longer helps balance the battery cells. Available in both the initial setup wizard and the options flow. Disabled by default (existing behaviour is preserved).
+- **WiFi Signal Strength sensor**: New diagnostic sensor (register 30303, dBm) available for all battery versions. Disabled by default.
+- **User Work Mode select**: New select entity (register 43000) available for all battery versions, with options `Manual`, `Self Consumption` (anti feed-in), and `AI Optimization` (trade mode). Disabled by default. Fully translated into EN, ES, DE, FR, and NL.
 
 ### Fixed
+- **`enabled_by_default: false` was ignored**: Modbus register entities (sensor, select, binary sensor, switch, number, button) did not propagate the `enabled_by_default` flag from their definition to the HA entity registry. All Modbus entity classes now set `_attr_entity_registry_enabled_default` from the definition, so entities marked `enabled_by_default: false` are correctly disabled in the registry for new installations.
+- **User Work Mode displayed wrong option due to battery firmware bug**: The battery's Modbus register for user work mode returns an incorrect value on readback. The integration now uses a persistent shadow state — the last value written is stored in config entry data and used for display instead of the polled register value. The shadow survives HA restarts. The register is still written correctly so the battery operates in the selected mode.
+- **Predictive charging starts despite switch being off (time slot mode)**: When the predictive charging switch was turned off during an active time slot, charging stopped correctly. However, when the slot ended, the override flag was silently reset to `False` in memory — so on the next slot cycle the switch appeared on again and charging started. The auto-reset on slot exit has been removed; the override now persists until the user explicitly turns the switch back on.
+- **Predictive charging starts despite switch being off (real-time price mode)**: The real-time price handler never consulted `predictive_charging_overridden` before activating charging. If the price dropped below the threshold while the switch was off, charging would start regardless. The handler now checks the override at the top of every cycle and stops any active charging immediately if it is set.
 - **v3 batteries: weekly full charge interrupted after HA restart when charge delay was enabled**: After a Home Assistant restart on the weekly full charge day, `_charge_delay_unlocked` was correctly restored from persistent storage but was then immediately overwritten to `False` by the daily-reset block, because `_charge_delay_last_date` is an in-memory variable that always starts as `None` after a restart. For v2 batteries this had no visible effect (the hardware cutoff register at 100 % remained set regardless of software state), but for v3 batteries the software-enforced `effective_max_soc` dropped back to the user's configured limit, stopping the charge mid-way. Fixed by only resetting `_charge_delay_unlocked` on a genuine day change (`_charge_delay_last_date is not None`); on the first cycle after a restart the restored value from storage is preserved.
 
 ## [1.6.6] - 2026-04-16
