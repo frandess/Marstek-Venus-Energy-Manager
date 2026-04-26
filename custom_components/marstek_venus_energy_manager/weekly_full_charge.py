@@ -225,7 +225,7 @@ class WeeklyFullChargeManager:
                     continue
 
                 if cutoff_reg is None:
-                    _LOGGER.warning(
+                    _LOGGER.debug(
                         "%s: Weekly full charge - no hardware cutoff register (v3 battery). "
                         "Using software enforcement to 100%%.",
                         coordinator.name
