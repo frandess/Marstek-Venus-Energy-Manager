@@ -31,6 +31,14 @@ async def async_setup_entry(
             entities.append(MarstekVenusNumber(coordinator, definition))
         entities.append(MarstekBackupThresholdNumber(coordinator))
 
+        # For batteries without hardware SOC cutoff registers (v3/vA/vD), expose
+        # software-enforced max/min SOC as live-editable entities. The PD controller
+        # already enforces these in software; previously they were only changeable
+        # through the options flow.
+        if coordinator.get_register("charging_cutoff_capacity") is None:
+            entities.append(MarstekSoftSocLimitNumber(coordinator, "max"))
+            entities.append(MarstekSoftSocLimitNumber(coordinator, "min"))
+
     # Add config numbers (system-level, PD parameters)
     for definition in CONFIG_NUMBER_DEFINITIONS:
         # Skip conditional entities if their feature has never been configured
@@ -191,6 +199,77 @@ class MarstekConfigNumberEntity(NumberEntity):
             "name": "Marstek Venus System",
             "manufacturer": "Marstek",
             "model": "Venus Multi-Battery System",
+        }
+
+
+class MarstekSoftSocLimitNumber(CoordinatorEntity, NumberEntity):
+    """Software-enforced SOC limit for batteries that don't expose hardware cutoff registers (v3/vA/vD).
+
+    Mirrors the UX of the v2 charging/discharging_cutoff_capacity number entities,
+    but writes only to coordinator state and config_entry.data — no Modbus write.
+    The PD controller reads coordinator.max_soc / coordinator.min_soc each cycle.
+    """
+
+    def __init__(self, coordinator: MarstekVenusDataUpdateCoordinator, kind: str) -> None:
+        """Initialize. kind must be 'max' or 'min'."""
+        super().__init__(coordinator)
+        self._kind = kind
+        self._attr_has_entity_name = True
+        self._attr_native_unit_of_measurement = "%"
+        self._attr_native_step = 1
+        self._attr_should_poll = False
+        if kind == "max":
+            self._attr_translation_key = "charging_cutoff_capacity"
+            self._attr_unique_id = f"{coordinator.host}_charging_cutoff_capacity"
+            self._attr_icon = "mdi:battery-arrow-up"
+            self._attr_native_min_value = 50
+            self._attr_native_max_value = 100
+        else:
+            self._attr_translation_key = "discharging_cutoff_capacity"
+            self._attr_unique_id = f"{coordinator.host}_discharging_cutoff_capacity"
+            self._attr_icon = "mdi:battery-arrow-down"
+            self._attr_native_min_value = 5
+            self._attr_native_max_value = 50
+
+    @property
+    def native_value(self) -> float:
+        """Return the current software limit."""
+        if self._kind == "max":
+            return float(self.coordinator.max_soc)
+        return float(self.coordinator.min_soc)
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Update the limit on the coordinator and persist it."""
+        new_value = int(value)
+        if self._kind == "max":
+            old = self.coordinator.max_soc
+            self.coordinator.max_soc = new_value
+            self.coordinator.persist_battery_config("max_soc", new_value)
+            # Mirror v2 hysteresis-reset behavior when raising the limit
+            if self.coordinator.enable_charge_hysteresis:
+                current_soc = self.coordinator.data.get("battery_soc", 0) if self.coordinator.data else 0
+                if new_value > old and current_soc < new_value:
+                    self.coordinator._hysteresis_active = False
+                    _LOGGER.info("%s: Hysteresis reset (max_soc %d%% → %d%%, SOC=%.1f%%)",
+                                 self.coordinator.name, old, new_value, current_soc)
+            _LOGGER.info("%s: max_soc %d%% → %d%% (software limit)",
+                         self.coordinator.name, old, new_value)
+        else:
+            old = self.coordinator.min_soc
+            self.coordinator.min_soc = new_value
+            self.coordinator.persist_battery_config("min_soc", new_value)
+            _LOGGER.info("%s: min_soc %d%% → %d%% (software limit)",
+                         self.coordinator.name, old, new_value)
+        self.async_write_ha_state()
+
+    @property
+    def device_info(self):
+        """Return device information."""
+        return {
+            "identifiers": {(DOMAIN, self.coordinator.host)},
+            "name": self.coordinator.name,
+            "manufacturer": "Marstek",
+            "model": "Venus",
         }
 
 
