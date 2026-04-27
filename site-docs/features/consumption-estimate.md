@@ -6,17 +6,21 @@ Predictive charging needs to know how much energy your home consumes each day to
 
 ## What the estimate measures
 
-The estimated consumption for a day is the sum of two components:
+The integration supports two accumulation methods depending on whether an optional **household consumption sensor** is configured.
+
+### Method 1 — Battery discharge + unmet demand (default)
+
+When no household consumption sensor is configured, the estimated consumption for a day is the sum of two components:
 
 ```
 Day consumption = Actual battery discharge + Unmet demand (grid at min SOC)
 ```
 
-### 1. Actual battery discharge
+#### Actual battery discharge
 
 The energy the battery has discharged during the day, read directly from each battery's coordinator (`total_daily_discharging_energy`). This value resets at midnight according to the battery's internal clock.
 
-### 2. Unmet demand — Grid at min SOC
+#### Unmet demand — Grid at min SOC
 
 When **all batteries are at min SOC** and can no longer discharge, the household must draw from the grid to cover its consumption. That grid-imported energy is real household consumption the battery could not serve.
 
@@ -36,6 +40,14 @@ increment (kWh) = grid_power (W) × 2.5 s / 3,600,000
 ```
 
 This accumulator is exposed as the **`Grid at Min SOC`** sensor (kWh) and resets at midnight.
+
+### Method 2 — Household consumption sensor (optional)
+
+If a **household consumption sensor** is configured (a power sensor in W or kW measuring total household electricity consumption), the integration integrates it directly to build the daily figure instead of using the battery discharge + grid-at-min-SOC calculation.
+
+Accumulation only runs while `is_in_consumption_window()` is true: all 24 hours when no charging time slot is configured, or the hours outside the charging slot on slot days. This scoping ensures the measured window matches what predictive charging expects when it later uses the average to project remaining demand.
+
+The accumulated daily value is exposed as the **`Household Energy Today`** sensor (kWh) and resets at midnight.
 
 ---
 

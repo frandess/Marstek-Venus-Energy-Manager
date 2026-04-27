@@ -84,6 +84,14 @@ Para evitar el "ping-pong" de activación/desactivación, se aplican tres nivele
 
 Una vez seleccionadas las baterías activas, la potencia total calculada por el [controlador PD](pd-controller.md) se reparte entre ellas proporcionalmente, respetando los límites individuales de potencia y SOC de cada una.
 
+## Exclusión de baterías sin respuesta
+
+Cuando una batería no entrega la potencia solicitada de forma reiterada — por ejemplo, por un fallo de comunicación Modbus o por una autoprotección del firmware — la integración lo detecta y la retira temporalmente del grupo activo.
+
+Una batería se marca como sin respuesta cuando su potencia entregada es inferior al 5 % de la consigna durante **3 ciclos de control consecutivos**. Una vez marcada, entra en una **ventana de exclusión de 5 minutos** durante la cual no recibe nuevas consignas y las baterías restantes absorben su parte de la carga. Al expirar la ventana, el contador de fallos se reinicia y la batería vuelve a ser elegible.
+
+Este mecanismo impide que una sola batería con problemas degrade silenciosamente el rendimiento del sistema sin generar alarmas ni requerir intervención manual.
+
 ## Modos compatibles
 
 La distribución multi-batería se aplica en todos los modos:

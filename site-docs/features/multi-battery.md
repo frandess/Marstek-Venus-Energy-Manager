@@ -84,6 +84,14 @@ To avoid "ping-pong" activation/deactivation, three hysteresis levels are applie
 
 Once active batteries are selected, the total power calculated by the [PD controller](pd-controller.md) is distributed among them proportionally, respecting each battery's individual power and SOC limits.
 
+## Non-responsive battery exclusion
+
+When a battery consistently fails to deliver the commanded power — for example due to a Modbus communication glitch or a firmware self-protection response — the integration detects this and temporarily removes it from the active pool.
+
+A battery is flagged as non-responsive when its measured output is below 5% of the commanded setpoint for **3 consecutive control cycles**. Once flagged, it enters a **5-minute exclusion window** during which it receives no new commands and the remaining batteries absorb its share of the load. After the window expires the fail counter resets and the battery becomes eligible again.
+
+This mechanism prevents a single misbehaving battery from silently degrading system performance without raising alarms or requiring manual intervention.
+
 ## Compatible modes
 
 Multi-battery distribution applies in all modes:

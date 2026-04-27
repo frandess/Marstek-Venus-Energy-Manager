@@ -6,17 +6,21 @@ La carga predictiva necesita saber cuánta energía consume tu hogar cada día p
 
 ## Qué mide el consumo estimado
 
-El consumo estimado de un día es la suma de dos componentes:
+La integración soporta dos métodos de acumulación según si se ha configurado o no un **sensor de consumo del hogar** opcional.
+
+### Método 1 — Descarga de batería + demanda insatisfecha (por defecto)
+
+Cuando no hay sensor de consumo del hogar configurado, el consumo estimado de un día es la suma de dos componentes:
 
 ```
 Consumo del día = Descarga real de la batería + Demanda insatisfecha (red a min SOC)
 ```
 
-### 1. Descarga real de la batería
+#### Descarga real de la batería
 
 La energía que la batería ha descargado durante el día, leída directamente de los coordinadores de cada batería (`total_daily_discharging_energy`). Este valor se resetea a medianoche según el reloj interno de la batería.
 
-### 2. Demanda insatisfecha — Red a SOC mínimo
+#### Demanda insatisfecha — Red a SOC mínimo
 
 Cuando **todas las baterías están al SOC mínimo** y ya no pueden descargar más, el hogar tiene que tirar de la red para cubrir su consumo. Esa energía importada de la red es consumo real del hogar que la batería no pudo atender.
 
@@ -36,6 +40,14 @@ incremento (kWh) = potencia_red (W) × 2,5 s / 3 600 000
 ```
 
 Este acumulador se expone como el sensor **`Grid at Min SOC`** (kWh) y se resetea a medianoche.
+
+### Método 2 — Sensor de consumo del hogar (opcional)
+
+Si se configura un **sensor de consumo del hogar** (un sensor de potencia en W o kW que mide el consumo eléctrico total del hogar), la integración lo integra directamente para construir el valor diario en lugar de usar el cálculo de descarga de batería + red a min SOC.
+
+La acumulación solo se ejecuta mientras `is_in_consumption_window()` es verdadero: las 24 horas completas cuando no hay franja de carga configurada, o las horas fuera de la franja de carga en los días de la franja. Este acotamiento garantiza que la ventana medida coincide con lo que la carga predictiva espera al usar después el promedio para proyectar la demanda restante.
+
+El valor diario acumulado se expone como el sensor **`Household Energy Today`** (kWh) y se resetea a medianoche.
 
 ---
 
