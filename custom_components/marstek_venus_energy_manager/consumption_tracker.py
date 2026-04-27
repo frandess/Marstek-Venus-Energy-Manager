@@ -683,8 +683,10 @@ class ConsumptionTracker:
         if ctrl.household_consumption_sensor:
             current_value = round(ctrl._household_energy_accumulator, 2)
             if current_value < 1.5:
-                _LOGGER.warning(
-                    "Daily consumption capture: household accumulator too low (%.2f kWh), skipping",
+                _LOGGER.info(
+                    "Daily consumption capture: household accumulator low "
+                    "(%.2f kWh) — skipping. Today's value will be recovered "
+                    "from recorder history on the next predictive-charging cycle.",
                     current_value,
                 )
                 return
