@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.7.1] - 2026-04-26
+
+### Fixed
+- **Spurious warning on v3 weekly full charge**: Each time a weekly full charge activated on a v3 battery, a `WARNING`-level log entry appeared stating that software enforcement would be used (instead of the hardware cutoff register). This is expected behaviour for v3 hardware and does not indicate a problem. The message has been downgraded to `DEBUG` so it only appears when debug logging is explicitly enabled.
+- **Alarming `WARNING` when the daily consumption capture had nothing to record**: On days not covered by `charging_time_slot.days` the household accumulator legitimately stays at 0 — the integration only accumulates outside the charging slot, and skips entire days that aren't in the slot's day list. The 23:55 capture would then log `WARNING: household accumulator too low (0.00 kWh), skipping`, which sounded like data loss. In reality `get_dynamic_base_consumption()` already self-heals: on the next predictive-charging cycle it runs an opportunistic recorder backfill that replaces the day's default sentinel (`DEFAULT_BASE_CONSUMPTION_KWH = 5.0`) with the real value from the household sensor history. The message has been downgraded to `INFO` and reworded to make the self-healing behaviour explicit, so the log entry no longer suggests something is broken.
+
+### Changed (internal)
+- **`__init__.py` and `coordinator.py` split into focused modules**: Pure code-movement refactor with no behavioural change. Roughly 1,500 lines were extracted from `__init__.py` (which had grown to ~5,660 LOC) and ~95 lines from `coordinator.py`, replicating the existing `balance_monitor.py` extraction template — the controller still owns the public attributes that sensors and switches read, while the new modules own the logic, persistent `Store`s, and lifecycle. New files:
+  - `non_responsive_tracker.py` — non-responsive battery detection and 5-minute exclusion windows.
+  - `alarm_notifier.py` — alarm/fault bit-delta detection and HA persistent-notification formatting (extracted from the coordinator; the previous-bitmask state lives with the notifier now).
+  - `weekly_full_charge.py` — weekly full charge state, persistence and register-write orchestration; bundled persistence format (weekly + delay_unlocked + solar_t_start) preserved for backward compatibility.
+  - `consumption_tracker.py` — consumption history, daily energy accumulators (household + solar production), solar-timing detection (`t_start`/`t_end`/solar-noon), recorder backfill, and the 23:55 local-time daily capture. The `DEFAULT_BASE_CONSUMPTION_KWH` sentinel, timezone-aware recorder queries, and the rule that `_capture_from_history` *replaces* default entries instead of appending are all preserved.
+
 ## [1.7.0] - 2026-04-25
 
 ### Added
