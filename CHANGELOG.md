@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.7.2] - 2026-04-28
+
+### Fixed
+- **Total Charging/Discharging Energy sensor periodically resets to near-zero**: The battery firmware occasionally returns a corrupt partial value when a Modbus read of the 32-bit energy counter coincides with an internal firmware update of that register. The read technically succeeds (no error logged), but the decoded value can be a fraction of the real counter (e.g. ~50 kWh instead of ~491 kWh). Because the sensor has `state_class: total_increasing`, Home Assistant interprets the drop as a meter reset and permanently corrupts Energy Dashboard statistics. Fixed by adding a monotonic guard in the coordinator: for any `total_increasing` sensor, a new reading that is positive but less than 90 % of the last known value is silently discarded. Drops to exactly 0 (daily counter midnight reset, factory reset) are still accepted. Applies to `total_charging_energy`, `total_discharging_energy`, `total_daily_charging_energy`, and `total_daily_discharging_energy`.
+
 ## [1.7.1] - 2026-04-26
 
 ### Added
