@@ -2,6 +2,20 @@
 
 ## [1.7.2] - 2026-04-28
 
+### ⚠️ Breaking Change — Target Grid Power
+
+**The per-timeslot "Target Grid Power" field has been removed.**
+
+Previously each discharge time slot had its own independent *Target Grid Power* offset (the watt setpoint the PD controller regulated the grid to during that slot). That per-slot field no longer exists.
+
+It has been replaced by a **single global "PD Target Grid Power"** setting that applies for the entire integration, regardless of which slot is active. The new control is:
+
+- Configurable in the **Options → Advanced PD Controller** flow.
+- Exposed as a live **number entity** (`number.marstek_venus_system_pd_target_grid_power`) that can be changed at runtime without reloading the integration.
+- Default: **0 W** (net-zero grid regulation, same as the previous default).
+
+**Action required on upgrade:** If any of your timeslots had a non-zero Target Grid Power, the value has been reset to 0 W. Open Options → Advanced PD Controller and set the new global value to your desired setpoint.
+
 ### Fixed
 - **Total Charging/Discharging Energy sensor periodically resets to near-zero**: The battery firmware occasionally returns a corrupt partial value when a Modbus read of the 32-bit energy counter coincides with an internal firmware update of that register. The read technically succeeds (no error logged), but the decoded value can be a fraction of the real counter (e.g. ~50 kWh instead of ~491 kWh). Because the sensor has `state_class: total_increasing`, Home Assistant interprets the drop as a meter reset and permanently corrupts Energy Dashboard statistics. Fixed by adding a monotonic guard in the coordinator: for any `total_increasing` sensor, a new reading that is positive but less than 90 % of the last known value is silently discarded. Drops to exactly 0 (daily counter midnight reset, factory reset) are still accepted. Applies to `total_charging_energy`, `total_discharging_energy`, `total_daily_charging_energy`, and `total_daily_discharging_energy`.
 ### Changed
